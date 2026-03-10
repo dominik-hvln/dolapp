@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Ewidencja Czasu Pracy</string>
+    <string name="title_activity_main">Ewidencja Czasu Pracy</string>
+    <string name="package_name">pl.kadromierz.hvln</string>
+    <string name="custom_url_scheme">pl.kadromierz.hvln</string>
+</resources>

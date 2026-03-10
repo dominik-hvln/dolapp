@@ -1,0 +1,30 @@
+# Ignoruj node_modules
+node_modules/
+
+# Ignoruj pliki dev i build
+.next/
+out/
+*.log
+npm-debug.log*
+.env
+.env.local
+.env.*.local
+
+# Ignoruj pliki testowe
+coverage/
+
+# Ignoruj pliki IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Ignoruj pliki tymczasowe
+.DS_Store
+*.tmp
+
+# Ignoruj Capacitor (nie potrzebne w Docker)
+android/
+ios/
+capacitor.config.ts
