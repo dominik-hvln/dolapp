@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/aplikacja-czas-pracy.iml" filepath="$PROJECT_DIR$/aplikacja-czas-pracy.iml" />
+      <module fileurl="file://$PROJECT_DIR$/dolapp.iml" filepath="$PROJECT_DIR$/dolapp.iml" />
     </modules>
   </component>
 </project>

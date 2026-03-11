@@ -36,7 +36,6 @@ export const navLinks: NavLink[] = [
         icon: ShieldCheck,
         roles: ['super_admin']
     },
-
 ];
 
 interface SidebarProps {
