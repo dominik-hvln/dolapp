@@ -1,7 +1,7 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'pl.kadromierz.hvln',
+  appId: 'pl.dolapp.hvln',
   appName: 'Dolapp',
   webDir: 'out',
   server: {

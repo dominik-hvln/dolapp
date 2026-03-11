@@ -22,6 +22,8 @@ dist
 .next/
 out/
 build/
+android/
+ios/
 
 # Pliki środowiskowe (Environment variables)
 # BARDZO WAŻNE: Te pliki zawierają hasła i klucze API. Nigdy nie mogą trafić do repozytorium!

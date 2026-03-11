@@ -31,19 +31,12 @@ export const navLinks: NavLink[] = [
     { href: '/dashboard/users', label: 'Użytkownicy', icon: Users, roles: ['admin', 'manager'] },
     { href: '/dashboard/locations', label: 'Kody Ogólne', icon: MapPin, moduleCode: 'geolocation', roles: ['admin', 'manager'] },
     {
-        href: '/dashboard/billing',
-        label: 'Subskrypcja',
-        icon: CreditCard,
-        roles: ['admin'] // Bez modułu, bo admin musi mieć dostęp zawsze
-    },
-
-    // ✅ SUPER ADMIN
-    {
         href: '/dashboard/super-admin',
         label: 'Super Admin',
         icon: ShieldCheck,
         roles: ['super_admin']
     },
+
 ];
 
 interface SidebarProps {
