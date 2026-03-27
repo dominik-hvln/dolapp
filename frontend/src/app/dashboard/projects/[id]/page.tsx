@@ -43,6 +43,8 @@ export default function ProjectDetailsPage() {
     // Stany dla edycji geofence
     const [geofence, setGeofence] = useState({ lat: 52.4064, lng: 16.9252 });
     const [radius, setRadius] = useState(500);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [isSearching, setIsSearching] = useState(false);
 
     // Dynamiczne ładowanie komponentu mapy
     const GeofenceMap = useMemo(() => dynamic(() =>
@@ -85,6 +87,26 @@ export default function ProjectDetailsPage() {
             toast.success('Sukces!', { description: 'Strefa geofence została zaktualizowana.' });
         } catch (error) {
             toast.error('Błąd', { description: 'Nie udało się zapisać strefy.' });
+        }
+    };
+
+    const handleSearchAddress = async () => {
+        if (!searchQuery.trim()) return;
+        setIsSearching(true);
+        try {
+            const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&limit=1`);
+            const data = await response.json();
+            if (data && data.length > 0) {
+                const { lat, lon } = data[0];
+                setGeofence({ lat: parseFloat(lat), lng: parseFloat(lon) });
+                toast.success('Znaleziono adres', { description: data[0].display_name });
+            } else {
+                toast.error('Nie znaleziono adresu', { description: 'Spróbuj wpisać bardziej szczegółowy adres.' });
+            }
+        } catch (error) {
+            toast.error('Błąd wyszukiwania', { description: 'Nie udało się połączyć z usługą geolokalizacji.' });
+        } finally {
+            setIsSearching(false);
         }
     };
 
@@ -131,6 +153,23 @@ export default function ProjectDetailsPage() {
             <div className="mt-8">
                 <h2 className="text-2xl font-bold mb-4">Strefa Geofence</h2>
                 <div className="grid gap-6">
+                    <div className="flex gap-2">
+                        <div className="grid gap-2 flex-grow">
+                            <Label htmlFor="address-search">Wyszukaj adres</Label>
+                            <div className="flex gap-2">
+                                <Input
+                                    id="address-search"
+                                    placeholder="Wpisz adres, np. Poznań, Głogowska 10"
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    onKeyDown={(e) => e.key === 'Enter' && handleSearchAddress()}
+                                />
+                                <Button onClick={handleSearchAddress} disabled={isSearching} variant="secondary">
+                                    {isSearching ? 'Szukanie...' : 'Szukaj'}
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
                     <GeofenceMap
                         center={[geofence.lat, geofence.lng]}
                         radius={radius}

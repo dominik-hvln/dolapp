@@ -1,6 +1,6 @@
 'use client';
 
-import { MapContainer, TileLayer, Marker, Circle, useMapEvents } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Circle, useMapEvents, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { useEffect, useState } from 'react';
@@ -32,6 +32,15 @@ function MapEventsHandler({ onCenterChange }: { onCenterChange: (latlng: L.LatLn
     return null;
 }
 
+// Komponent do aktualizacji widoku mapy przy zmianie środka
+function ChangeView({ center }: { center: [number, number] }) {
+    const map = useMap();
+    useEffect(() => {
+        map.setView(center, map.getZoom());
+    }, [center, map]);
+    return null;
+}
+
 export function GeofenceMap({ center, radius, onCenterChange }: GeofenceMapProps) {
     const [icon, setIcon] = useState<L.Icon | null>(null);
 
@@ -45,6 +54,7 @@ export function GeofenceMap({ center, radius, onCenterChange }: GeofenceMapProps
     return (
         <MapContainer center={center} zoom={15} style={{ height: '400px', width: '100%' }} className="rounded-md z-0">
             <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+            <ChangeView center={center} />
             <Marker
                 position={center}
                 draggable={true}
