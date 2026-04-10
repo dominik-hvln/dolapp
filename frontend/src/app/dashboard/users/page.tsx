@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { CreateUserForm } from '@/components/users/CreateUserForm';
 
-interface User { id: string; first_name: string; last_name: string; email: string; role: string; }
+interface User { id: string; first_name: string; last_name: string; email: string; role: string; is_active?: boolean; }
 
 export default function UsersPage() {
     const [users, setUsers] = useState<User[]>([]);
@@ -25,6 +25,15 @@ export default function UsersPage() {
             setIsLoading(false);
         }
     };
+    const toggleActive = async (userId: string, currentlyActive: boolean) => {
+        try {
+            const endpoint = currentlyActive ? `/users/${userId}/deactivate` : `/users/${userId}/activate`;
+            await api.patch(endpoint);
+            fetchUsers();
+        } catch (error) {
+            console.error('Błąd zmiany statusu:', error);
+        }
+    };
     useEffect(() => { fetchUsers(); }, []);
     const handleUserCreated = () => { setIsDialogOpen(false); fetchUsers(); };
 
@@ -39,13 +48,22 @@ export default function UsersPage() {
             </div>
             <div className="border rounded-lg">
                 <Table>
-                    <TableHeader><TableRow><TableHead>Imię i nazwisko</TableHead><TableHead>E-mail</TableHead><TableHead>Rola</TableHead></TableRow></TableHeader>
+                    <TableHeader><TableRow><TableHead>Imię i nazwisko</TableHead><TableHead>E-mail</TableHead><TableHead>Rola</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
                     <TableBody>
                         {users.map((user) => (
                             <TableRow key={user.id}>
                                 <TableCell>{user.first_name} {user.last_name}</TableCell>
                                 <TableCell>{user.email}</TableCell>
                                 <TableCell>{user.role}</TableCell>
+                                <TableCell>
+                                    <Button
+                                        variant={user.is_active ? "default" : "outline"}
+                                        size="sm"
+                                        onClick={() => toggleActive(user.id, !!user.is_active)}
+                                    >
+                                        {user.is_active ? 'Aktywny' : 'Nieaktywny'}
+                                    </Button>
+                                </TableCell>
                             </TableRow>
                         ))}
                     </TableBody>

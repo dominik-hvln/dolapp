@@ -37,4 +37,17 @@ ios/
 # Pliki specyficzne dla systemów operacyjnych
 # Pliki generowane automatycznie przez macOS, Windows, Linux.
 .DS_Store
-Thumbs.dbkadromierz_kod.txt
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+
+# Claude Code
+.claude/
+
+# Superpowers (plany, specyfikacje generowane przez AI)
+docs/superpowers/
+
+# Agent workflows
+.agent/

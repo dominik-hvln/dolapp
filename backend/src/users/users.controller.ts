@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Body, UseGuards, Req } from '@nestjs/common';
+import { Controller, Post, Get, Body, UseGuards, Req, Patch, Param } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { AuthGuard } from '@nestjs/passport';
@@ -23,5 +23,17 @@ export class UsersController {
     findAll(@Req() req) {
         const companyId = req.user.company_id;
         return this.usersService.findAllForCompany(companyId);
+    }
+
+    @Patch(':id/activate')
+    @Roles(Role.Admin, Role.Manager)
+    activate(@Param('id') userId: string, @Req() req) {
+        return this.usersService.activate(userId, req.user.company_id);
+    }
+
+    @Patch(':id/deactivate')
+    @Roles(Role.Admin, Role.Manager)
+    deactivate(@Param('id') userId: string, @Req() req) {
+        return this.usersService.deactivate(userId, req.user.company_id);
     }
 }

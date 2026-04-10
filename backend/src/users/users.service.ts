@@ -1,4 +1,4 @@
-import { Injectable, InternalServerErrorException, ConflictException, ForbiddenException } from '@nestjs/common';
+import { Injectable, InternalServerErrorException, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { SupabaseService } from '../supabase/supabase.service';
 import { SubscriptionService } from '../subscription/subscription.service';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -44,6 +44,7 @@ export class UsersService {
                 last_name: createUserDto.lastName,
                 role: createUserDto.role,
                 email: createUserDto.email,
+                is_active: true,
             })
             .select()
             .single();
@@ -65,6 +66,29 @@ export class UsersService {
 
         if (error) return 0;
         return count || 0;
+    }
+
+    private async setActiveStatus(userId: string, companyId: string, isActive: boolean) {
+        const supabase = this.supabaseService.getClient();
+        const { data, error } = await supabase
+            .from('users')
+            .update({ is_active: isActive })
+            .eq('id', userId)
+            .eq('company_id', companyId)
+            .select('id')
+            .single();
+
+        if (error) throw new InternalServerErrorException(error.message);
+        if (!data) throw new NotFoundException('Nie znaleziono użytkownika.');
+        return { message: isActive ? 'Użytkownik aktywowany.' : 'Użytkownik dezaktywowany.' };
+    }
+
+    async activate(userId: string, companyId: string) {
+        return this.setActiveStatus(userId, companyId, true);
+    }
+
+    async deactivate(userId: string, companyId: string) {
+        return this.setActiveStatus(userId, companyId, false);
     }
 
     async findAllForCompany(companyId: string) {

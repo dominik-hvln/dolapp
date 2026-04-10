@@ -96,6 +96,7 @@ function UserInfoCard({ user }: { user: AuthUser }) {
 export function AdminDashboard() {
     const [summary, setSummary] = useState<DashboardSummary | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const [inviteCode, setInviteCode] = useState<string | null>(null);
 
     const { user } = useAuthStore();
 
@@ -111,6 +112,9 @@ export function AdminDashboard() {
             }
         };
         fetchSummary();
+        api.get('/companies/invite-code')
+            .then(res => setInviteCode(res.data.inviteCode))
+            .catch(() => {});
     }, []);
 
     return (
@@ -120,6 +124,13 @@ export function AdminDashboard() {
             <div className="lg:col-span-2 space-y-6">
 
                 {user && <UserInfoCard user={user} />}
+
+                {inviteCode && (
+                    <div className="p-4 border rounded-lg bg-muted/30">
+                        <p className="text-sm text-muted-foreground mb-1">Kod firmy (do rejestracji pracowników)</p>
+                        <p className="text-2xl font-mono font-bold tracking-widest">{inviteCode}</p>
+                    </div>
+                )}
 
                 <div className="glassmorphism-box p-6">
                     <h2 className="text-xl font-semibold mb-4">Podsumowanie</h2>

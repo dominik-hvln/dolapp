@@ -287,6 +287,55 @@ export class TimeEntriesService {
         return { message: 'Wpis został pomyślnie usunięty.' };
     }
 
+    async getTimeSummary(userId: string) {
+        const supabase = this.supabaseService.getClient();
+        const now = new Date();
+
+        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+
+        const dayOfWeek = now.getDay();
+        const mondayOffset = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+        const weekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - mondayOffset).toISOString();
+
+        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+
+        const { data: entries, error } = await supabase
+            .from('time_entries')
+            .select('start_time, end_time')
+            .eq('user_id', userId)
+            .gte('start_time', monthStart)
+            .order('start_time', { ascending: true });
+
+        if (error) throw new InternalServerErrorException(error.message);
+
+        let today = 0;
+        let thisWeek = 0;
+        let thisMonth = 0;
+
+        const nowMs = now.getTime();
+
+        for (const entry of entries || []) {
+            const start = new Date(entry.start_time).getTime();
+            const end = entry.end_time ? new Date(entry.end_time).getTime() : nowMs;
+            const durationMinutes = Math.max(0, (end - start) / 60000);
+
+            thisMonth += durationMinutes;
+
+            if (entry.start_time >= weekStart) {
+                thisWeek += durationMinutes;
+            }
+            if (entry.start_time >= todayStart) {
+                today += durationMinutes;
+            }
+        }
+
+        return {
+            today: Math.round(today),
+            thisWeek: Math.round(thisWeek),
+            thisMonth: Math.round(thisMonth),
+        };
+    }
+
     async getAuditLogs(entryId: string, companyId: string) {
         const supabase = this.supabaseService.getClient();
         const { data: entry } = await supabase.from('time_entries').select('id').eq('id', entryId).eq('company_id', companyId).single();

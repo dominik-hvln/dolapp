@@ -33,6 +33,12 @@ export class TimeEntriesController {
         });
     }
 
+    @Get('my-summary')
+    @Roles(Role.Employee, Role.Admin, Role.Manager)
+    getTimeSummary(@Req() req) {
+        return this.timeEntriesService.getTimeSummary(req.user.id);
+    }
+
     @Patch(':id')
     @Roles(Role.Admin, Role.Manager)
     update(

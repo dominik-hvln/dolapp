@@ -3,6 +3,7 @@ import {
     InternalServerErrorException,
     ConflictException,
     UnauthorizedException,
+    BadRequestException,
     Logger,
 } from '@nestjs/common';
 import { Response } from 'express';
@@ -79,12 +80,43 @@ export class AuthService {
         const supabase = this.supabaseService.getClient();
         const supabaseAdmin = this.supabaseService.getAdminClient();
 
-        const { data: companyData, error: companyError } = await supabase
-            .from('companies').insert({ name: registerDto.companyName }).select().single();
+        const hasCompanyCode = !!registerDto.companyCode;
+        const hasCompanyName = !!registerDto.companyName;
 
-        if (companyError) {
-            this.logger.error(`Błąd tworzenia firmy: ${JSON.stringify(companyError)}`);
-            throw new InternalServerErrorException(`Błąd tworzenia firmy: ${companyError.message}`);
+        if (!hasCompanyCode && !hasCompanyName) {
+            throw new BadRequestException('Podaj nazwę firmy lub kod firmy.');
+        }
+
+        let companyId: string;
+        let userRole: string;
+        let isActive: boolean;
+
+        if (hasCompanyCode) {
+            const { data: company, error: findError } = await supabase
+                .from('companies')
+                .select('id')
+                .eq('invite_code', registerDto.companyCode!.toUpperCase())
+                .single();
+
+            if (findError || !company) {
+                throw new BadRequestException('Nieprawidłowy kod firmy.');
+            }
+
+            companyId = company.id;
+            userRole = 'employee';
+            isActive = false;
+        } else {
+            const { data: companyData, error: companyError } = await supabase
+                .from('companies').insert({ name: registerDto.companyName }).select().single();
+
+            if (companyError) {
+                this.logger.error(`Błąd tworzenia firmy: ${JSON.stringify(companyError)}`);
+                throw new InternalServerErrorException(`Błąd tworzenia firmy: ${companyError.message}`);
+            }
+
+            companyId = companyData.id;
+            userRole = 'admin';
+            isActive = true;
         }
 
         const appUrl = this.config.get<string>('APP_URL')?.replace(/\/+$/, '') || 'http://localhost:3000';
@@ -102,7 +134,9 @@ export class AuthService {
 
         if (linkErr) {
             this.logger.error(`Błąd generateLink: ${JSON.stringify(linkErr)}`);
-            await supabase.from('companies').delete().eq('id', companyData.id);
+            if (!hasCompanyCode) {
+                await supabase.from('companies').delete().eq('id', companyId);
+            }
             if (linkErr.message?.includes('User already registered')) {
                 throw new ConflictException('Użytkownik o tym adresie e-mail już istnieje.');
             }
@@ -113,7 +147,9 @@ export class AuthService {
         let confirmUrl = linkData?.properties?.action_link;
         if (!userId || !confirmUrl) {
             this.logger.error('Nie udało się wygenerować userId lub confirmUrl');
-            await supabase.from('companies').delete().eq('id', companyData.id);
+            if (!hasCompanyCode) {
+                await supabase.from('companies').delete().eq('id', companyId);
+            }
             throw new InternalServerErrorException('Nie udało się wygenerować linku aktywacyjnego.');
         }
 
@@ -131,11 +167,13 @@ export class AuthService {
             .upsert(
                 {
                     id: userId,
-                    company_id: companyData.id,
+                    company_id: companyId,
                     first_name: registerDto.firstName,
                     last_name: registerDto.lastName,
-                    role: 'admin',
+                    role: userRole,
                     email: registerDto.email,
+                    is_active: isActive,
+                    phone: registerDto.phone || null,
                 },
                 { onConflict: 'id' }
             );
@@ -143,7 +181,9 @@ export class AuthService {
         if (profileError) {
             this.logger.error(`Błąd tworzenia profilu users: ${JSON.stringify(profileError)}`);
             await supabaseAdmin.auth.admin.deleteUser(userId);
-            await supabase.from('companies').delete().eq('id', companyData.id);
+            if (!hasCompanyCode) {
+                await supabase.from('companies').delete().eq('id', companyId);
+            }
             throw new InternalServerErrorException(`Błąd profilu: ${profileError.message}`);
         }
 
@@ -152,16 +192,19 @@ export class AuthService {
                 registerDto.email,
                 'Potwierdź swój adres e-mail',
                 `
-                <p>Cześć ${registerDto.firstName || ''},</p>
-                <p>Dokończ rejestrację klikając w link poniżej:</p>
-                <p><a href="${confirmUrl}" target="_blank" rel="noopener noreferrer">${confirmUrl}</a></p>
-                `,
+            <p>Cześć ${registerDto.firstName || ''},</p>
+            <p>Dokończ rejestrację klikając w link poniżej:</p>
+            <p><a href="${confirmUrl}" target="_blank" rel="noopener noreferrer">${confirmUrl}</a></p>
+            `,
                 `Potwierdź rejestrację: ${confirmUrl}`
             );
         } catch (emailErr: any) {
             this.logger.error(`Błąd wysyłki e-maila: ${emailErr.message}`);
         }
 
+        if (hasCompanyCode) {
+            return { message: 'Rejestracja udana. Sprawdź e-mail, a potem poczekaj na aktywację przez administratora.' };
+        }
         return { message: 'Rejestracja udana. Sprawdź e-mail, aby aktywować konto.' };
     }
 
@@ -316,6 +359,37 @@ export class AuthService {
             );
         }
         return { message: 'Jeśli konto istnieje, wysłaliśmy nowy link.' };
+    }
+
+    async deleteAccount(userId: string, userEmail: string, password: string) {
+        const supabase = this.supabaseService.getClient();
+        const supabaseAdmin = this.supabaseService.getAdminClient();
+
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+            email: userEmail,
+            password,
+        });
+
+        if (signInError) {
+            throw new UnauthorizedException('Nieprawidłowe hasło.');
+        }
+
+        const { error: deleteProfileError } = await supabaseAdmin
+            .from('users')
+            .delete()
+            .eq('id', userId);
+
+        if (deleteProfileError) {
+            this.logger.error(`Błąd usuwania profilu: ${deleteProfileError.message}`);
+            throw new InternalServerErrorException('Nie udało się usunąć konta.');
+        }
+
+        const { error: deleteAuthError } = await supabaseAdmin.auth.admin.deleteUser(userId);
+        if (deleteAuthError) {
+            this.logger.error(`Błąd usuwania auth user: ${deleteAuthError.message}`);
+        }
+
+        return { message: 'Konto zostało usunięte.' };
     }
 
     async verifyEmailToken(token: string, type: string, res: Response) {

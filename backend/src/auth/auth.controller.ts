@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Get, UseGuards, Req, Query, BadRequestException, Res } from '@nestjs/common';
+import { Controller, Post, Body, Get, UseGuards, Req, Query, BadRequestException, Res, Delete } from '@nestjs/common';
 import type { Response } from 'express';
 import { AuthGuard } from '@nestjs/passport';
 import { AuthService } from './auth.service';
@@ -6,6 +6,7 @@ import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { ForgotPasswordDto } from "./dto/forgot-password.dto";
 import { ResetPasswordDto } from "./dto/reset-password.dto";
+import { DeleteAccountDto } from './dto/delete-account.dto';
 
 @Controller('auth') // Wszystkie trasy w tym kontrolerze będą zaczynać się od /auth
 export class AuthController {
@@ -40,6 +41,12 @@ export class AuthController {
     @Post('password/reset')
     reset(@Body() dto: ResetPasswordDto) {
         return this.authService.resetPassword(dto);
+    }
+
+    @Delete('delete-account')
+    @UseGuards(AuthGuard('jwt'))
+    async deleteAccount(@Body() dto: DeleteAccountDto, @Req() req) {
+        return this.authService.deleteAccount(req.user.id, req.user.email, dto.password);
     }
 
     @Get('verify')

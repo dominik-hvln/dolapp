@@ -1,5 +1,4 @@
-// src/auth/dto/register.dto.ts
-import { IsEmail, IsNotEmpty, IsString, MinLength } from 'class-validator';
+import { IsEmail, IsNotEmpty, IsOptional, IsString, MinLength } from 'class-validator';
 
 export class RegisterDto {
     @IsNotEmpty({ message: 'Adres e-mail jest wymagany.' })
@@ -11,7 +10,6 @@ export class RegisterDto {
     @MinLength(8, { message: 'Hasło musi mieć co najmniej 8 znaków.' })
     password: string;
 
-    // ZMIANA PONIŻEJ
     @IsNotEmpty({ message: 'Imię jest wymagane.' })
     @IsString()
     firstName: string;
@@ -19,9 +17,16 @@ export class RegisterDto {
     @IsNotEmpty({ message: 'Nazwisko jest wymagane.' })
     @IsString()
     lastName: string;
-    // KONIEC ZMIANY
 
-    @IsNotEmpty({ message: 'Nazwa firmy jest wymagana.' })
+    @IsOptional()
     @IsString()
-    companyName: string;
+    companyName?: string;
+
+    @IsOptional()
+    @IsString()
+    companyCode?: string;
+
+    @IsOptional()
+    @IsString()
+    phone?: string;
 }
