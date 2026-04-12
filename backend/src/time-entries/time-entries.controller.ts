@@ -4,6 +4,7 @@ import { AuthGuard } from '@nestjs/passport';
 import { Role, Roles } from "../auth/roles.decorator";
 import { UpdateTimeEntryDto } from "./dto/update-time-entry.dto";
 import { SwitchTaskDto } from './dto/switch-task.dto';
+import { GeofenceEventDto } from './dto/geofence-event.dto';
 
 @Controller('time-entries')
 @UseGuards(AuthGuard('jwt'))
@@ -64,6 +65,12 @@ export class TimeEntriesController {
     getAuditLogs(@Param('id') entryId: string, @Req() req) {
         const companyId = req.user.company_id;
         return this.timeEntriesService.getAuditLogs(entryId, companyId);
+    }
+
+    @Post('geofence-exit')
+    geofenceExit(@Body() geofenceEventDto: GeofenceEventDto, @Req() req) {
+        const userId = req.user.id;
+        return this.timeEntriesService.geofenceExit(userId, geofenceEventDto.location, geofenceEventDto.timestamp);
     }
 
     @Post('switch-task')

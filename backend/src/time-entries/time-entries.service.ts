@@ -1,4 +1,4 @@
-import { Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
+import { Injectable, InternalServerErrorException, NotFoundException, BadRequestException } from '@nestjs/common';
 import { SupabaseService } from '../supabase/supabase.service';
 import { UpdateTimeEntryDto } from "./dto/update-time-entry.dto";
 
@@ -25,6 +25,96 @@ export class TimeEntriesService {
         const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)); return R * c;
     }
     // --- Koniec metod pomocniczych ---
+
+    /**
+     * Geofence exit - pauzuje aktywny wpis gdy pracownik opuści strefę
+     */
+    async geofenceExit(
+        userId: string,
+        location?: { latitude: number; longitude: number },
+        timestamp?: string,
+    ) {
+        const supabase = this.supabaseService.getClient();
+        const eventTime = timestamp ? new Date(timestamp).toISOString() : new Date().toISOString();
+        const gpsLocationString = location ? `(${location.longitude},${location.latitude})` : null;
+
+        const { data: activeEntry } = await supabase
+            .from('time_entries')
+            .select('id, project_id')
+            .eq('user_id', userId)
+            .is('end_time', null)
+            .is('paused_at', null)
+            .order('start_time', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+        if (!activeEntry) {
+            throw new NotFoundException('Brak aktywnego wpisu do spauzowania.');
+        }
+
+        if (location && activeEntry.project_id) {
+            const isOutside = await this.getGeofenceStatus(activeEntry.project_id, location);
+            if (!isOutside) {
+                throw new BadRequestException('Użytkownik jest wewnątrz strefy geofence.');
+            }
+        }
+
+        const { data: pausedEntry, error: updateError } = await supabase
+            .from('time_entries')
+            .update({ paused_at: eventTime })
+            .eq('id', activeEntry.id)
+            .select('*, task:tasks(name)')
+            .single();
+
+        if (updateError) throw new InternalServerErrorException(updateError.message);
+
+        await supabase.from('geofence_pauses').insert({
+            time_entry_id: activeEntry.id,
+            paused_at: eventTime,
+            pause_location: gpsLocationString,
+        });
+
+        return { status: 'paused', entry: pausedEntry };
+    }
+
+    /**
+     * Pomocnicza - wznawia spauzowany wpis (wywoływana z handleScan/switchTask)
+     */
+    private async resumePausedEntry(
+        entryId: string,
+        location?: { latitude: number; longitude: number },
+    ) {
+        const supabase = this.supabaseService.getClient();
+        const now = new Date().toISOString();
+        const gpsLocationString = location ? `(${location.longitude},${location.latitude})` : null;
+
+        const { data: resumedEntry, error } = await supabase
+            .from('time_entries')
+            .update({ paused_at: null })
+            .eq('id', entryId)
+            .select('*, task:tasks(name)')
+            .single();
+
+        if (error) throw new InternalServerErrorException(error.message);
+
+        const { data: lastPause } = await supabase
+            .from('geofence_pauses')
+            .select('id')
+            .eq('time_entry_id', entryId)
+            .is('resumed_at', null)
+            .order('paused_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+        if (lastPause) {
+            await supabase
+                .from('geofence_pauses')
+                .update({ resumed_at: now, resume_location: gpsLocationString })
+                .eq('id', lastPause.id);
+        }
+
+        return resumedEntry;
+    }
 
     /**
      * PRZEPISANA LOGIKA OBSŁUGI SKANOWANIA
@@ -78,6 +168,12 @@ export class TimeEntriesService {
 
         // --- Mamy aktywny wpis?
         if (lastEntry) {
+            // Sprawdź czy wpis jest spauzowany i skan dotyczy tego samego taska - wznów
+            if (lastEntry.paused_at && scanType === 'task' && lastEntry.task_id === scannedTaskId) {
+                const resumedEntry = await this.resumePausedEntry(lastEntry.id, location);
+                return { status: 'resumed', entry: resumedEntry };
+            }
+
             // Zawsze najpierw go zamykamy
             const isOutsideOnClockOut = await this.getGeofenceStatus(lastEntry.project_id, location || null);
             const { data: closedEntry } = await supabase
@@ -185,10 +281,21 @@ export class TimeEntriesService {
             .maybeSingle();
 
         if (lastEntry) {
-            const isOutsideOnClockOut = await this.getGeofenceStatus(lastEntry.project_id, location || null);
+            // Jeśli spauzowany wpis dotyczy tego samego taska - wznów
+            if (lastEntry.paused_at && lastEntry.task_id === taskId) {
+                const resumedEntry = await this.resumePausedEntry(lastEntry.id, location);
+                return { status: 'resumed', entry: resumedEntry };
+            }
+
+            // Zamknij spauzowany lub aktywny wpis przed pauzą trzeba wyczyścić
+            const isOutsideOnClockOut = lastEntry.paused_at
+                ? true
+                : await this.getGeofenceStatus(lastEntry.project_id, location || null);
+
             await supabase
                 .from('time_entries')
                 .update({
+                    paused_at: null,
                     end_time: eventTime,
                     end_gps_location: gpsLocationString,
                     is_outside_geofence: lastEntry.is_outside_geofence || isOutsideOnClockOut,
@@ -229,14 +336,14 @@ export class TimeEntriesService {
         const supabase = this.supabaseService.getClient();
         const { data, error } = await supabase
             .from('time_entries')
-            .select('*, task:tasks(name)')
+            .select('*, task:tasks(name, project_id), project:projects(geo_latitude, geo_longitude, geo_radius_meters)')
             .eq('user_id', userId)
             .is('end_time', null)
             .order('start_time', { ascending: false })
             .limit(1)
             .maybeSingle();
         if (error) throw new InternalServerErrorException(error.message);
-        return data; // albo null
+        return data; // albo null - zawiera paused_at i dane geofence projektu
     }
 
     async findAllForCompany(companyId: string, filters: { dateFrom?: string; dateTo?: string; userId?: string }) {
@@ -301,7 +408,7 @@ export class TimeEntriesService {
 
         const { data: entries, error } = await supabase
             .from('time_entries')
-            .select('start_time, end_time')
+            .select('id, start_time, end_time, paused_at, geofence_pauses(paused_at, resumed_at)')
             .eq('user_id', userId)
             .gte('start_time', monthStart)
             .order('start_time', { ascending: true });
@@ -316,8 +423,23 @@ export class TimeEntriesService {
 
         for (const entry of entries || []) {
             const start = new Date(entry.start_time).getTime();
-            const end = entry.end_time ? new Date(entry.end_time).getTime() : nowMs;
-            const durationMinutes = Math.max(0, (end - start) / 60000);
+            const end = entry.paused_at
+                ? new Date(entry.paused_at).getTime()
+                : entry.end_time
+                    ? new Date(entry.end_time).getTime()
+                    : nowMs;
+            let durationMinutes = Math.max(0, (end - start) / 60000);
+
+            const pauses = (entry as any).geofence_pauses || [];
+            for (const pause of pauses) {
+                if (pause.resumed_at) {
+                    const pauseStart = new Date(pause.paused_at).getTime();
+                    const pauseEnd = new Date(pause.resumed_at).getTime();
+                    durationMinutes -= Math.max(0, (pauseEnd - pauseStart) / 60000);
+                }
+            }
+
+            durationMinutes = Math.max(0, durationMinutes);
 
             thisMonth += durationMinutes;
 
