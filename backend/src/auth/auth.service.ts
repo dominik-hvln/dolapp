@@ -281,7 +281,7 @@ export class AuthService {
             let resetUrl = linkData?.properties?.action_link;
             if (!resetUrl) {
                 console.warn('[forgotPassword] Brak action_link w generateLink');
-                return { message: 'Jeśli konto istnieje, wysłaliśmy instrukcje resetu haseł.' };
+                return { message: 'Jeśli konto istnieje, wysłaliśmy instrukcje resetu hasła.' };
             }
 
             const backendUrl = this.config.get<string>('BACKEND_URL')?.replace(/\/+$/, '') || 'http://localhost:4000';

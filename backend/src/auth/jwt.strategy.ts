@@ -34,7 +34,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
             .single();
 
         if (error || !user) {
-            throw new UnauthorizedException('Użytkownik nie znaleziony.');
+            throw new UnauthorizedException('Nie znaleziono użytkownika.');
         }
 
         // Zwrócony obiekt zostanie dołączony do obiektu `request` jako `req.user`
