@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, UseGuards, Req, Param, Patch } from '@nestjs/common';
+import { Controller, Get, Post, Body, UseGuards, Req, Param, Patch, Delete } from '@nestjs/common';
 import { ProjectsService } from './projects.service';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
@@ -40,6 +40,13 @@ export class ProjectsController {
     update(@Param('id') id: string, @Req() req, @Body() updateProjectDto: UpdateProjectDto) {
         const companyId = req.user.company_id;
         return this.projectsService.update(id, companyId, updateProjectDto);
+    }
+
+    @Delete(':id')
+    @Roles(Role.Admin, Role.Manager)
+    remove(@Param('id') id: string, @Req() req) {
+        const companyId = req.user.company_id;
+        return this.projectsService.remove(id, companyId);
     }
 
     @Post(':id/qr-code')

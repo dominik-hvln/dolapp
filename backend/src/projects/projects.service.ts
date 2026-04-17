@@ -84,6 +84,41 @@ export class ProjectsService {
         return data;
     }
 
+    async remove(id: string, companyId: string) {
+        await this.findOne(id, companyId);
+
+        const supabase = this.supabaseService.getClient();
+
+        const { data: tasks, error: tasksError } = await supabase
+            .from('tasks')
+            .select('id')
+            .eq('project_id', id);
+        if (tasksError) throw new InternalServerErrorException(tasksError.message);
+        const taskIds = (tasks ?? []).map((t) => t.id);
+
+        const throwIfError = (res: { error: { message: string } | null }) => {
+            if (res.error) throw new InternalServerErrorException(res.error.message);
+        };
+
+        // time_entries: zachowujemy historię rozliczeń - zerujemy tylko referencje
+        const cleanupOps = [
+            supabase.from('qr_codes').delete().eq('project_id', id).then((r) => r),
+            supabase.from('time_entries').update({ task_id: null, project_id: null }).eq('project_id', id).then((r) => r),
+        ];
+        if (taskIds.length > 0) {
+            cleanupOps.push(
+                supabase.from('task_assignments').delete().in('task_id', taskIds).then((r) => r),
+                supabase.from('qr_codes').delete().in('task_id', taskIds).then((r) => r),
+            );
+        }
+        (await Promise.all(cleanupOps)).forEach(throwIfError);
+
+        throwIfError(await supabase.from('tasks').delete().eq('project_id', id));
+        throwIfError(
+            await supabase.from('projects').delete().eq('id', id).eq('company_id', companyId),
+        );
+    }
+
     async generateQrCode(projectId: string) {
         const supabase = this.supabaseService.getClient();
         const { data: existingCode, error: findError } = await supabase

@@ -1,4 +1,4 @@
-import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import { Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { SupabaseService } from '../supabase/supabase.service';
 import { CreateTaskDto } from './dto/create-task.dto';
 
@@ -26,6 +26,37 @@ export class TasksService {
             .eq('company_id', companyId);
         if (error) throw new InternalServerErrorException(error.message);
         return data;
+    }
+
+    async remove(taskId: string, projectId: string, companyId: string) {
+        const supabase = this.supabaseService.getClient();
+
+        const { data: task, error: findError } = await supabase
+            .from('tasks')
+            .select('id')
+            .eq('id', taskId)
+            .eq('project_id', projectId)
+            .eq('company_id', companyId)
+            .single();
+        if (findError || !task) {
+            throw new NotFoundException(`Task with ID ${taskId} not found.`);
+        }
+
+        const throwIfError = (res: { error: { message: string } | null }) => {
+            if (res.error) throw new InternalServerErrorException(res.error.message);
+        };
+
+        // time_entries: zachowujemy historię rozliczeń - zerujemy tylko task_id (project_id zostaje)
+        const results = await Promise.all([
+            supabase.from('task_assignments').delete().eq('task_id', taskId).then((r) => r),
+            supabase.from('qr_codes').delete().eq('task_id', taskId).then((r) => r),
+            supabase.from('time_entries').update({ task_id: null }).eq('task_id', taskId).then((r) => r),
+        ]);
+        results.forEach(throwIfError);
+
+        throwIfError(
+            await supabase.from('tasks').delete().eq('id', taskId).eq('company_id', companyId),
+        );
     }
 
     async generateQrCode(taskId: string) {

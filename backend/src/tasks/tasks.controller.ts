@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, UseGuards, Req, Param } from '@nestjs/common';
+import { Controller, Get, Post, Body, UseGuards, Req, Param, Delete } from '@nestjs/common';
 import { TasksService } from './tasks.service';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { AuthGuard } from '@nestjs/passport';
@@ -52,5 +52,16 @@ export class TasksController {
     @Roles(Role.Admin, Role.Manager)
     generateQrCode(@Param('taskId') taskId: string) {
         return this.tasksService.generateQrCode(taskId);
+    }
+
+    @Delete('/in-project/:projectId/:taskId')
+    @Roles(Role.Admin, Role.Manager)
+    remove(
+        @Param('projectId') projectId: string,
+        @Param('taskId') taskId: string,
+        @Req() req,
+    ) {
+        const companyId = req.user.company_id;
+        return this.tasksService.remove(taskId, projectId, companyId);
     }
 }
