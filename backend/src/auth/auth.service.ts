@@ -34,6 +34,10 @@ export class AuthService {
             const smtpHost = this.config.get<string>('SMTP_HOST')?.trim() || '';
             const smtpPort = Number(this.config.get('SMTP_PORT')) || 587;
             const secure = smtpPort === 465 || this.config.get<string>('SMTP_SECURE')?.trim() === 'true';
+            const connectionTimeout = Number(this.config.get('SMTP_CONNECTION_TIMEOUT_MS')) || 10_000;
+            const greetingTimeout = Number(this.config.get('SMTP_GREETING_TIMEOUT_MS')) || 10_000;
+            const socketTimeout = Number(this.config.get('SMTP_SOCKET_TIMEOUT_MS')) || 30_000;
+            const dnsTimeout = Number(this.config.get('SMTP_DNS_TIMEOUT_MS')) || 10_000;
 
             if (!smtpUser || !smtpPass) {
                 this.logger.error(`Brak danych logowania SMTP! USER: ${smtpUser ? 'OK' : 'BRAK'}, PASS: ${smtpPass ? 'OK' : 'BRAK'}`);
@@ -49,6 +53,10 @@ export class AuthService {
                     user: smtpUser,
                     pass: smtpPass,
                 },
+                connectionTimeout,
+                greetingTimeout,
+                socketTimeout,
+                dnsTimeout,
             });
         }
         return this.transporter;
@@ -187,20 +195,18 @@ export class AuthService {
             throw new InternalServerErrorException(`Błąd profilu: ${profileError.message}`);
         }
 
-        try {
-            await this.sendSmtpEmail(
-                registerDto.email,
-                'Potwierdź swój adres e-mail',
-                `
+        void this.sendSmtpEmail(
+            registerDto.email,
+            'Potwierdź swój adres e-mail',
+            `
             <p>Cześć ${registerDto.firstName || ''},</p>
             <p>Dokończ rejestrację klikając w link poniżej:</p>
             <p><a href="${confirmUrl}" target="_blank" rel="noopener noreferrer">${confirmUrl}</a></p>
             `,
-                `Potwierdź rejestrację: ${confirmUrl}`
-            );
-        } catch (emailErr: any) {
-            this.logger.error(`Błąd wysyłki e-maila: ${emailErr.message}`);
-        }
+            `Potwierdź rejestrację: ${confirmUrl}`
+        ).catch((emailErr: any) => {
+            this.logger.error(`Błąd wysyłki e-maila po rejestracji: ${emailErr.message}`);
+        });
 
         if (hasCompanyCode) {
             return { message: 'Rejestracja udana. Sprawdź e-mail, a potem poczekaj na aktywację przez administratora.' };
