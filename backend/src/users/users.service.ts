@@ -34,7 +34,7 @@ export class UsersService {
         return this.transporter;
     }
 
-    private async sendWelcomeEmail(email: string, password: string, firstName: string) {
+    private async sendWelcomeEmail(email: string, firstName: string) {
         const fromHeader = this.config.get<string>('MAIL_FROM') || '"Dolapp" <no-reply@localhost>';
         try {
             await this.getTransporter().sendMail({
@@ -44,15 +44,11 @@ export class UsersService {
                 html: `
                     <p>Cześć ${firstName},</p>
                     <p>Administrator utworzył dla Ciebie konto w aplikacji <strong>Dolapp</strong>.</p>
-                    <p>Twoje dane logowania:</p>
-                    <ul>
-                        <li><strong>Email:</strong> ${email}</li>
-                        <li><strong>Hasło:</strong> ${password}</li>
-                    </ul>
-                    <p>Zalecamy zmianę hasła po pierwszym logowaniu.</p>
+                    <p>Twój adres e-mail do logowania: <strong>${email}</strong></p>
+                    <p>Hasło do pierwszego logowania otrzymasz od administratora. Zalecamy jego zmianę po zalogowaniu.</p>
                     <p>Pozdrawiamy,<br/>Zespół Dolapp</p>
                 `,
-                text: `Cześć ${firstName}, Twoje konto w Dolapp zostało utworzone. Email: ${email}, Hasło: ${password}. Zalecamy zmianę hasła po pierwszym logowaniu.`,
+                text: `Cześć ${firstName}, Twoje konto w Dolapp zostało utworzone. Twój email do logowania: ${email}. Hasło do pierwszego logowania otrzymasz od administratora. Zalecamy jego zmianę po zalogowaniu.`,
             });
             this.logger.log(`E-mail powitalny wysłany do ${email}`);
         } catch (error: any) {
@@ -104,7 +100,7 @@ export class UsersService {
             throw new InternalServerErrorException(profileError.message);
         }
 
-        this.sendWelcomeEmail(createUserDto.email, createUserDto.password, createUserDto.firstName);
+        this.sendWelcomeEmail(createUserDto.email, createUserDto.firstName);
 
         return profileData;
     }
