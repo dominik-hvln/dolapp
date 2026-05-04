@@ -20,13 +20,10 @@ async function bootstrap() {
         })
     );
 
-    const whitelist = new Set<string>([
-        'http://localhost:3000',       // dev web
-        'http://localhost',            // Android (Capacitor)
-        'capacitor://localhost',       // iOS (Capacitor)
-        'https://kadromierz.vercel.app',
-        'https://app.dolapp.pl',
-    ]);
+    const corsOrigins = process.env.CORS_ORIGINS
+        ? process.env.CORS_ORIGINS.split(',').map(s => s.trim())
+        : ['http://localhost:3000', 'http://localhost', 'capacitor://localhost'];
+    const whitelist = new Set<string>(corsOrigins);
 
     app.enableCors({
         origin: (origin, cb) => {
