@@ -134,10 +134,10 @@ export class TimeEntriesService {
         let scannedTaskId: string | null = null;
         let scanType: 'task' | 'location' = 'location';
 
-        // 1) Czy to kod ZLECENIA?
+        // 1) Czy to kod ZLECENIA lub PROJEKTU?
         const { data: taskQrCode } = await supabase
             .from('qr_codes')
-            .select('task:tasks(id, project_id)')
+            .select('task:tasks(id, project_id), project_id')
             .eq('code_value', qrCodeValue)
             .maybeSingle();
 
@@ -145,6 +145,9 @@ export class TimeEntriesService {
             scanType = 'task';
             scannedTaskId = (taskQrCode as any).task.id as string;
             scannedProjectId = (taskQrCode as any).task.project_id as string;
+        } else if (taskQrCode && (taskQrCode as any).project_id) {
+            scanType = 'location';
+            scannedProjectId = (taskQrCode as any).project_id as string;
         } else {
             // 2) Czy to kod LOKALIZACJI (ogólny)?
             const { data: locationQr } = await supabase
@@ -220,18 +223,18 @@ export class TimeEntriesService {
 
         // --- Brak aktywnego wpisu -> start pracy
         if (scanType === 'location') {
-            // Start dnia „ogólnego”
+            const isOutside = scannedProjectId ? await this.getGeofenceStatus(scannedProjectId, location || null) : false;
             const { data: newEntry } = await supabase
                 .from('time_entries')
                 .insert({
                     user_id: userId,
-                    project_id: null,
+                    project_id: scannedProjectId,
                     task_id: null,
                     company_id: companyId,
                     start_time: eventTime,
                     start_gps_location: gpsLocationString,
                     is_offline_entry: !!timestamp,
-                    is_outside_geofence: false,
+                    is_outside_geofence: isOutside,
                 })
                 .select('*, task:tasks(name)')
                 .maybeSingle();
