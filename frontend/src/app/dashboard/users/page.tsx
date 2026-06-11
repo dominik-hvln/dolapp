@@ -6,13 +6,23 @@ import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { CreateUserForm } from '@/components/users/CreateUserForm';
+import { EditUserForm, EditableUser } from '@/components/users/EditUserForm';
+import { Pencil } from 'lucide-react';
 
-interface User { id: string; first_name: string; last_name: string; email: string; role: string; is_active?: boolean; }
+interface User extends EditableUser {
+    email: string;
+    is_active?: boolean;
+}
+
+function formatRate(value: number | null | undefined): string {
+    return `${(Number(value) || 0).toFixed(2)} zł/h`;
+}
 
 export default function UsersPage() {
     const [users, setUsers] = useState<User[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
+    const [editedUser, setEditedUser] = useState<User | null>(null);
 
     const fetchUsers = async () => {
         setIsLoading(true);
@@ -20,7 +30,7 @@ export default function UsersPage() {
             const response = await api.get('/users');
             setUsers(response.data);
         } catch (error) {
-            console.error('Błąd podczas pobierania projektów:', error);
+            console.error('Błąd podczas pobierania użytkowników:', error);
         } finally {
             setIsLoading(false);
         }
@@ -36,6 +46,7 @@ export default function UsersPage() {
     };
     useEffect(() => { fetchUsers(); }, []);
     const handleUserCreated = () => { setIsDialogOpen(false); fetchUsers(); };
+    const handleUserUpdated = () => { setEditedUser(null); fetchUsers(); };
 
     return (
         <div>
@@ -48,13 +59,27 @@ export default function UsersPage() {
             </div>
             <div className="border rounded-lg">
                 <Table>
-                    <TableHeader><TableRow><TableHead>Imię i nazwisko</TableHead><TableHead>E-mail</TableHead><TableHead>Rola</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Imię i nazwisko</TableHead>
+                            <TableHead>E-mail</TableHead>
+                            <TableHead>Rola</TableHead>
+                            <TableHead>Stawka</TableHead>
+                            <TableHead>Nadgodziny</TableHead>
+                            <TableHead>Limit dzienny</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead></TableHead>
+                        </TableRow>
+                    </TableHeader>
                     <TableBody>
                         {users.map((user) => (
                             <TableRow key={user.id}>
                                 <TableCell>{user.first_name} {user.last_name}</TableCell>
                                 <TableCell>{user.email}</TableCell>
                                 <TableCell>{user.role}</TableCell>
+                                <TableCell>{formatRate(user.hourly_rate)}</TableCell>
+                                <TableCell>{formatRate(user.overtime_rate)}</TableCell>
+                                <TableCell>{((Number(user.daily_limit_minutes) || 480) / 60).toFixed(1).replace('.0', '')} h</TableCell>
                                 <TableCell>
                                     <Button
                                         variant={user.is_active ? "default" : "outline"}
@@ -64,11 +89,23 @@ export default function UsersPage() {
                                         {user.is_active ? 'Aktywny' : 'Nieaktywny'}
                                     </Button>
                                 </TableCell>
+                                <TableCell>
+                                    <Button variant="outline" size="sm" onClick={() => setEditedUser(user)}>
+                                        <Pencil className="h-4 w-4 mr-1" /> Edytuj
+                                    </Button>
+                                </TableCell>
                             </TableRow>
                         ))}
                     </TableBody>
                 </Table>
             </div>
+
+            <Dialog open={!!editedUser} onOpenChange={(open) => { if (!open) setEditedUser(null); }}>
+                <DialogContent>
+                    <DialogHeader><DialogTitle>Edytuj pracownika</DialogTitle></DialogHeader>
+                    {editedUser && <EditUserForm user={editedUser} onSuccess={handleUserUpdated} />}
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

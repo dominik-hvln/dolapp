@@ -17,17 +17,21 @@ const formSchema = z.object({
     email: z.string().email("Niepoprawny adres e-mail."),
     password: z.string().min(8, "Hasło musi mieć co najmniej 8 znaków."),
     role: z.enum(['employee', 'manager']),
+    hourlyRate: z.number().min(0, "Stawka nie może być ujemna."),
+    overtimeRate: z.number().min(0, "Stawka nie może być ujemna."),
+    dailyLimitHours: z.number().min(0).max(24, "Limit nie może przekraczać 24h."),
 });
 
 export function CreateUserForm({ onSuccess }: { onSuccess: () => void }) {
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
-        defaultValues: { firstName: '', lastName: '', email: '', password: '', role: 'employee' },
+        defaultValues: { firstName: '', lastName: '', email: '', password: '', role: 'employee', hourlyRate: 0, overtimeRate: 0, dailyLimitHours: 8 },
     });
 
     async function onSubmit(values: z.infer<typeof formSchema>) {
         try {
-            await api.post('/users', values);
+            const { dailyLimitHours, ...rest } = values;
+            await api.post('/users', { ...rest, dailyLimitMinutes: Math.round(dailyLimitHours * 60) });
             toast.success('Sukces!', {
                 description: 'Nowy pracownik został pomyślnie dodany.',
             });
@@ -59,6 +63,11 @@ export function CreateUserForm({ onSuccess }: { onSuccess: () => void }) {
                         <FormMessage />
                     </FormItem>
                 )} />
+                <div className="grid grid-cols-2 gap-4">
+                    <FormField control={form.control} name="hourlyRate" render={({ field }) => ( <FormItem><FormLabel>Stawka godzinowa (PLN/h)</FormLabel><FormControl><Input type="number" step="0.01" min="0" value={field.value} onChange={(e) => field.onChange(Number(e.target.value) || 0)} /></FormControl><FormMessage /></FormItem> )} />
+                    <FormField control={form.control} name="overtimeRate" render={({ field }) => ( <FormItem><FormLabel>Stawka za nadgodziny (PLN/h)</FormLabel><FormControl><Input type="number" step="0.01" min="0" value={field.value} onChange={(e) => field.onChange(Number(e.target.value) || 0)} /></FormControl><FormMessage /></FormItem> )} />
+                </div>
+                <FormField control={form.control} name="dailyLimitHours" render={({ field }) => ( <FormItem><FormLabel>Dzienny limit pracy (godziny)</FormLabel><FormControl><Input type="number" step="0.5" min="0" max="24" value={field.value} onChange={(e) => field.onChange(Number(e.target.value) || 0)} /></FormControl><FormMessage /></FormItem> )} />
                 <Button type="submit" disabled={form.formState.isSubmitting} className="w-full">
                     {form.formState.isSubmitting ? 'Dodawanie...' : 'Dodaj pracownika'}
                 </Button>

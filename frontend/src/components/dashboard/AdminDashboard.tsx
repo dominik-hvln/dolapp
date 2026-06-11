@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
 import { ActivityFeed } from './ActivityFeed';
+import { LaborCosts } from './LaborCosts';
 import { useAuthStore } from '@/store/auth.store';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Mail, Phone } from 'lucide-react';
@@ -144,6 +145,8 @@ export function AdminDashboard() {
                         )}
                     </div>
                 </div>
+
+                <LaborCosts />
 
                 <div className="glassmorphism-box p-6">
                     <h2 className="text-xl font-semibold mb-4">Ostatnio utworzone zlecenia</h2>
