@@ -45,6 +45,8 @@ export default function ProjectDetailsPage() {
     const [radius, setRadius] = useState(500);
     const [searchQuery, setSearchQuery] = useState('');
     const [isSearching, setIsSearching] = useState(false);
+    // Adres przypisany do strefy (z wyszukiwarki lub odwrotnej geokodyzacji pinezki)
+    const [resolvedAddress, setResolvedAddress] = useState('');
 
     // Dynamiczne ładowanie komponentu mapy
     const GeofenceMap = useMemo(() => dynamic(() =>
@@ -68,6 +70,7 @@ export default function ProjectDetailsPage() {
                 setGeofence({ lat: projectRes.data.geo_latitude, lng: projectRes.data.geo_longitude });
                 setRadius(projectRes.data.geo_radius_meters || 500);
             }
+            setResolvedAddress(projectRes.data.address || '');
         } catch (error) {
             toast.error('Błąd', { description: 'Nie udało się pobrać danych projektu.' });
         } finally {
@@ -77,13 +80,46 @@ export default function ProjectDetailsPage() {
 
     useEffect(() => { if (projectId) fetchData(); }, [projectId]);
 
+    // Odwrotna geokodyzacja - zamienia współrzędne pinezki na adres tekstowy
+    const reverseGeocode = async (lat: number, lng: number): Promise<string | null> => {
+        try {
+            const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
+            const data = await response.json();
+            return data?.display_name ?? null;
+        } catch {
+            return null;
+        }
+    };
+
     const handleSaveGeofence = async () => {
         try {
+            // Jeśli adres nie pochodzi z wyszukiwarki (np. pinezka ustawiona ręcznie na mapie),
+            // spróbuj go odczytać z współrzędnych, żeby pole "Adres" nie zostało puste.
+            let address = resolvedAddress.trim();
+            if (!address) {
+                const reverse = await reverseGeocode(geofence.lat, geofence.lng);
+                if (reverse) {
+                    address = reverse;
+                    setResolvedAddress(reverse);
+                }
+            }
+
             await api.patch(`/projects/${projectId}`, {
                 geo_latitude: geofence.lat,
                 geo_longitude: geofence.lng,
                 geo_radius_meters: Number(radius),
+                address: address || null,
             });
+
+            // Natychmiast odśwież nagłówek, żeby "Adres: Brak" zniknęło bez przeładowania.
+            setProject((prev) => (prev ? {
+                ...prev,
+                address,
+                geo_latitude: geofence.lat,
+                geo_longitude: geofence.lng,
+                geo_radius_meters: Number(radius),
+            } : prev));
+
             toast.success('Sukces!', { description: 'Strefa geofence została zaktualizowana.' });
         } catch (error) {
             toast.error('Błąd', { description: 'Nie udało się zapisać strefy.' });
@@ -99,6 +135,7 @@ export default function ProjectDetailsPage() {
             if (data && data.length > 0) {
                 const { lat, lon } = data[0];
                 setGeofence({ lat: parseFloat(lat), lng: parseFloat(lon) });
+                setResolvedAddress(data[0].display_name);
                 toast.success('Znaleziono adres', { description: data[0].display_name });
             } else {
                 toast.error('Nie znaleziono adresu', { description: 'Spróbuj wpisać bardziej szczegółowy adres.' });
@@ -168,12 +205,20 @@ export default function ProjectDetailsPage() {
                                     {isSearching ? 'Szukanie...' : 'Szukaj'}
                                 </Button>
                             </div>
+                            {resolvedAddress && (
+                                <p className="text-xs text-muted-foreground">Adres strefy: {resolvedAddress}</p>
+                            )}
                         </div>
                     </div>
                     <GeofenceMap
                         center={[geofence.lat, geofence.lng]}
                         radius={radius}
-                        onCenterChange={(latlng) => setGeofence(latlng)}
+                        onCenterChange={(latlng) => {
+                            setGeofence(latlng);
+                            // Ręczne przesunięcie pinezki - poprzedni adres jest nieaktualny,
+                            // zostanie odczytany ponownie z nowych współrzędnych przy zapisie.
+                            setResolvedAddress('');
+                        }}
                     />
                     <div className="flex flex-wrap items-center gap-4">
                         <div className="grid gap-2 flex-grow">
