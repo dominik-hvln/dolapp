@@ -8,6 +8,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { CreateUserForm } from '@/components/users/CreateUserForm';
 import { EditUserForm, EditableUser } from '@/components/users/EditUserForm';
 import { Pencil } from 'lucide-react';
+import { CompanyOvertimeSettingsCard } from '@/components/users/CompanyOvertimeSettingsCard';
+import type { TaskOption } from '@/lib/users';
 
 interface User extends EditableUser {
     email: string;
@@ -23,6 +25,7 @@ export default function UsersPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [editedUser, setEditedUser] = useState<User | null>(null);
+    const [tasks, setTasks] = useState<TaskOption[]>([]);
 
     const fetchUsers = async () => {
         setIsLoading(true);
@@ -44,7 +47,12 @@ export default function UsersPage() {
             console.error('Błąd zmiany statusu:', error);
         }
     };
-    useEffect(() => { fetchUsers(); }, []);
+    useEffect(() => {
+        fetchUsers();
+        api.get<TaskOption[]>('/tasks')
+            .then(({ data }) => setTasks(Array.isArray(data) ? data : []))
+            .catch((error) => console.error('Błąd podczas pobierania zadań:', error));
+    }, []);
     const handleUserCreated = () => { setIsDialogOpen(false); fetchUsers(); };
     const handleUserUpdated = () => { setEditedUser(null); fetchUsers(); };
 
@@ -56,6 +64,9 @@ export default function UsersPage() {
                     <DialogTrigger asChild><Button>Dodaj użytkownika</Button></DialogTrigger>
                     <DialogContent><DialogHeader><DialogTitle>Nowy użytkownik</DialogTitle></DialogHeader><CreateUserForm onSuccess={handleUserCreated} /></DialogContent>
                 </Dialog>
+            </div>
+            <div className="mb-6">
+                <CompanyOvertimeSettingsCard tasks={tasks} onSettingsChange={() => fetchUsers()} />
             </div>
             <div className="border rounded-lg">
                 <Table>

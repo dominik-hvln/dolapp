@@ -8,13 +8,15 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { format, differenceInMinutes, isValid } from 'date-fns';
-import { Calendar as CalendarIcon, MoreHorizontal, AlertTriangle } from 'lucide-react';
+import { format } from 'date-fns';
+import { Calendar as CalendarIcon, MoreHorizontal, AlertTriangle, MapPinOff } from 'lucide-react';
 import { DateRange } from 'react-day-picker';
 import {Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle} from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { EditEntryForm } from '@/components/time-entries/EditEntryForm';
+import { EntryDetailsDialog } from '@/components/time-entries/EntryDetailsDialog';
+import { TimeEntry, AuditLog, entryDurationMinutes, entryPausedMinutes, formatMinutes } from '@/lib/time-entries';
 import { AxiosError } from 'axios';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -24,23 +26,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { FileDown } from 'lucide-react';
 
-interface TimeEntry {
-    id: string;
-    start_time: string;
-    end_time: string | null;
-    user: { first_name: string; last_name: string };
-    project: { name: string };
-    task: { name: string };
-    was_edited: boolean;
-    is_outside_geofence: boolean;
-}
 interface User { id: string; first_name: string; last_name: string; }
-interface AuditLog {
-    id: number;
-    editor: { first_name: string | null; last_name: string | null };
-    created_at: string;
-    change_reason: string | null;
-}
 
 export default function TimeEntriesPage() {
     const [entries, setEntries] = useState<TimeEntry[]>([]);
@@ -53,41 +39,50 @@ export default function TimeEntriesPage() {
     const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
     const [isHistoryOpen, setIsHistoryOpen] = useState(false);
     const [deleteReason, setDeleteReason] = useState('');
+    const [entryDetails, setEntryDetails] = useState<TimeEntry | null>(null);
 
-    const totalDurationMinutes = useMemo(() => {
-        return entries.reduce((total, entry) => {
-            if (entry.end_time) {
-                const start = new Date(entry.start_time);
-                const end = new Date(entry.end_time);
-                if (isValid(start) && isValid(end)) {
-                    const diff = differenceInMinutes(end, start);
-                    return total + (diff > 0 ? diff : 0);
-                }
-            }
-            return total;
-        }, 0);
-    }, [entries]);
+    // Jedno źródło prawdy dla tabeli, sumy i eksportów: duration_minutes z backendu (czas pomniejszony o przerwy poza strefą).
+    const totalDurationMinutes = useMemo(
+        () => entries.reduce((total, entry) => total + entryDurationMinutes(entry), 0),
+        [entries],
+    );
+    const totalPausedMinutes = useMemo(
+        () => entries.reduce((total, entry) => total + entryPausedMinutes(entry), 0),
+        [entries],
+    );
 
     const totalHours = Math.floor(totalDurationMinutes / 60);
     const totalMinutes = totalDurationMinutes % 60;
 
     const handleExportCSV = () => {
-        const headers = "Pracownik;Projekt;Zlecenie;Data Rozpoczęcia;Czas Rozpoczęcia;Data Zakończenia;Czas Zakończenia;Czas Trwania (min)\n";
+        const headers = "Pracownik;Projekt;Zlecenie;Data Rozpoczęcia;Czas Rozpoczęcia;Data Zakończenia;Czas Zakończenia;Czas Trwania (min);Poza strefą (min);Liczba przerw;Uwagi\n";
 
+        // Escapowanie cudzysłowów i ochrona przed CSV/formula injection (komórki zaczynające się od = + - @).
+        const csvCell = (value: string) => {
+            const escaped = String(value).replace(/"/g, '""');
+            return `"${/^[=+\-@\t\r]/.test(escaped) ? `'${escaped}` : escaped}"`;
+        };
         const rows = entries.map(entry => {
             const start = new Date(entry.start_time);
             const end = entry.end_time ? new Date(entry.end_time) : null;
-            const durationMin = end ? differenceInMinutes(end, start) : 0;
+            const durationMin = entryDurationMinutes(entry);
+            const notes = [
+                entry.switched_by === 'auto_limit' ? 'auto: nadgodziny' : null,
+                !entry.end_time ? 'w trakcie' : null,
+            ].filter(Boolean).join(', ');
 
             return [
-                `"${entry.user.first_name} ${entry.user.last_name}"`,
-                `"${entry.project?.name || '-'}"`,
-                `"${entry.task?.name || 'Ogólny'}"`,
+                csvCell(`${entry.user.first_name} ${entry.user.last_name}`),
+                csvCell(entry.project?.name || '-'),
+                csvCell(entry.task?.name || 'Ogólny'),
                 start.toLocaleDateString('pl-PL'),
                 start.toLocaleTimeString('pl-PL'),
                 end ? end.toLocaleDateString('pl-PL') : '-',
                 end ? end.toLocaleTimeString('pl-PL') : '-',
-                durationMin
+                durationMin,
+                entryPausedMinutes(entry),
+                (entry.geofence_pauses ?? []).length,
+                csvCell(notes)
             ].join(';');
         }).join('\n');
 
@@ -135,7 +130,7 @@ export default function TimeEntriesPage() {
             doc.setFontSize(10);
             doc.text(`Filtry: ${date?.from ? format(date.from, 'dd.MM.yyyy') : ''} - ${date?.to ? format(date.to, 'dd.MM.yyyy') : ''}`, 14, 25);
 
-            const tableColumn = ["Pracownik", "Projekt / Zlecenie", "Start", "Koniec", "Czas Trwania"];
+            const tableColumn = ["Pracownik", "Projekt / Zlecenie", "Start", "Koniec", "Czas Trwania", "Poza strefą"];
             const tableRows: (string | number)[][] = [];
 
             entries.forEach(entry => {
@@ -144,7 +139,8 @@ export default function TimeEntriesPage() {
                     `${entry.project?.name || '-'} / ${entry.task?.name || 'Ogólny'}`,
                     new Date(entry.start_time).toLocaleString('pl-PL'),
                     entry.end_time ? new Date(entry.end_time).toLocaleString('pl-PL') : '-',
-                    formatDuration(entry.start_time, entry.end_time)
+                    formatDuration(entry),
+                    formatPaused(entry)
                 ];
                 tableRows.push(row);
             });
@@ -163,7 +159,7 @@ export default function TimeEntriesPage() {
             doc.setFontSize(12);
 
             // Ta linia teraz zadziała poprawnie
-            doc.text(`Łączny czas pracy: ${totalHours}h ${totalMinutes}m`, 14, finalY + 10);
+            doc.text(`Łączny czas pracy: ${totalHours}h ${totalMinutes}m (poza strefą: ${formatMinutes(totalPausedMinutes)})`, 14, finalY + 10);
 
             doc.save('raport_czasu_pracy.pdf');
 
@@ -208,16 +204,16 @@ export default function TimeEntriesPage() {
         fetchTimeEntries();
     }, [fetchUsers, fetchTimeEntries]); // ✅ Poprawione zależności useEffect
 
-    const formatDuration = (start: string, end: string | null) => {
-        if (!end) return 'W trakcie';
-        const startDate = new Date(start);
-        const endDate = new Date(end);
-        if (!isValid(startDate) || !isValid(endDate)) return 'N/A';
-        const minutes = differenceInMinutes(endDate, startDate);
-        if (minutes < 0) return 'Błąd';
-        const h = Math.floor(minutes / 60);
-        const m = minutes % 60;
-        return `${h}h ${m}m`;
+    const formatDuration = (entry: TimeEntry) => {
+        const label = formatMinutes(entryDurationMinutes(entry));
+        return entry.end_time ? label : `${label} (w trakcie)`;
+    };
+
+    const formatPaused = (entry: TimeEntry) => {
+        const pauses = (entry.geofence_pauses ?? []).length;
+        const minutes = entryPausedMinutes(entry);
+        if (!pauses && !minutes) return '-';
+        return `${formatMinutes(minutes)} (${pauses})`;
     };
 
     const handleDelete = async () => {
@@ -300,6 +296,9 @@ export default function TimeEntriesPage() {
                 </h3>
                 <p className="text-muted-foreground">
                     Łączny czas pracy: <span className="font-bold text-primary">{totalHours} godzin {totalMinutes} minut</span>
+                    {totalPausedMinutes > 0 && (
+                        <span> (poza strefą: {formatMinutes(totalPausedMinutes)}, nie wliczone)</span>
+                    )}
                 </p>
             </div>
             <div className="border rounded-lg">
@@ -311,12 +310,13 @@ export default function TimeEntriesPage() {
                             <TableHead>Start</TableHead>
                             <TableHead>Koniec</TableHead>
                             <TableHead>Czas trwania</TableHead>
+                            <TableHead>Poza strefą</TableHead>
                             <TableHead className="text-right">Akcje</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {isLoading ? (
-                            <TableRow><TableCell colSpan={6} className="text-center">Ładowanie...</TableCell></TableRow>
+                            <TableRow><TableCell colSpan={7} className="text-center">Ładowanie...</TableCell></TableRow>
                         ) : (
                             entries.map((entry) => (
                                 <TableRow key={entry.id}>
@@ -338,10 +338,36 @@ export default function TimeEntriesPage() {
                                             )}
                                         </div>
                                     </TableCell>
-                                    <TableCell>{entry.project?.name || '-'} / {entry.task?.name || 'Ogólny'}</TableCell> {/* Zabezpieczenie przed null */}
+                                    <TableCell>
+                                        <div className="flex items-center gap-1">
+                                            <span>{entry.project?.name || '-'} / {entry.task?.name || 'Ogólny'}</span>
+                                            {entry.switched_by === 'auto_limit' && (
+                                                <TooltipProvider delayDuration={100}>
+                                                    <Tooltip>
+                                                        <TooltipTrigger asChild>
+                                                            <Badge variant="secondary" className="ml-1 px-1 text-xs">auto: nadgodziny</Badge>
+                                                        </TooltipTrigger>
+                                                        <TooltipContent>
+                                                            <p>Wpis utworzony automatycznie po osiągnięciu limitu dziennego</p>
+                                                        </TooltipContent>
+                                                    </Tooltip>
+                                                </TooltipProvider>
+                                            )}
+                                        </div>
+                                    </TableCell>
                                     <TableCell>{new Date(entry.start_time).toLocaleString('pl-PL')}</TableCell>
                                     <TableCell>{entry.end_time ? new Date(entry.end_time).toLocaleString('pl-PL') : '-'}</TableCell>
-                                    <TableCell className="font-medium">{formatDuration(entry.start_time, entry.end_time)}</TableCell>
+                                    <TableCell className="font-medium">{formatDuration(entry)}</TableCell>
+                                    <TableCell>
+                                        {(entry.geofence_pauses ?? []).length > 0 || entryPausedMinutes(entry) > 0 ? (
+                                            <div className="flex items-center gap-1 text-muted-foreground">
+                                                <MapPinOff className={`h-4 w-4 ${entry.paused_at ? 'text-destructive' : ''}`} />
+                                                <span>{formatMinutes(entryPausedMinutes(entry))}</span>
+                                                <Badge variant="outline" className="px-1 text-xs">{(entry.geofence_pauses ?? []).length}</Badge>
+                                                {entry.paused_at && <span className="text-xs text-destructive">teraz poza strefą</span>}
+                                            </div>
+                                        ) : '-'}
+                                    </TableCell>
                                     <TableCell className="text-right">
                                         <DropdownMenu>
                                             <DropdownMenuTrigger asChild>
@@ -351,6 +377,7 @@ export default function TimeEntriesPage() {
                                                 </Button>
                                             </DropdownMenuTrigger>
                                             <DropdownMenuContent align="end">
+                                                <DropdownMenuItem onClick={() => setEntryDetails(entry)}>Szczegóły</DropdownMenuItem>
                                                 <DropdownMenuItem onClick={() => setEntryToEdit(entry)}>Edytuj</DropdownMenuItem>
                                                 <DropdownMenuItem onClick={() => handleShowHistory(entry.id)}>Pokaż historię</DropdownMenuItem>
                                                 <DropdownMenuItem onClick={() => setEntryToDelete(entry)} className="text-red-600">Usuń</DropdownMenuItem>
@@ -363,6 +390,8 @@ export default function TimeEntriesPage() {
                     </TableBody>
                 </Table>
             </div>
+
+            <EntryDetailsDialog entry={entryDetails} onClose={() => setEntryDetails(null)} />
 
             <Dialog open={!!entryToEdit} onOpenChange={() => setEntryToEdit(null)}>
                 <DialogContent>
@@ -416,7 +445,7 @@ export default function TimeEntriesPage() {
                                 {auditLogs.map((log: AuditLog) => ( // Typ 'any' tymczasowo
                                     <li key={log.id} className="p-3 border rounded-md">
                                         <p className="font-semibold">
-                                            {log.editor?.first_name || 'Nieznany'} {log.editor?.last_name || ''}
+                                            {log.editor ? `${log.editor.first_name ?? ''} ${log.editor.last_name ?? ''}`.trim() || 'Nieznany' : 'System'}
                                             <span className="font-normal text-muted-foreground"> - {new Date(log.created_at).toLocaleString('pl-PL')}</span>
                                         </p>
                                         <p className="text-sm text-muted-foreground">{log.change_reason || '-'}</p>
