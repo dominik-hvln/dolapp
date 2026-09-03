@@ -16,6 +16,13 @@ interface User extends EditableUser {
     is_active?: boolean;
 }
 
+function formatLimit(minutes: number | null | undefined): string {
+    const total = Math.round(Number(minutes) || 480);
+    const h = Math.floor(total / 60);
+    const m = total % 60;
+    return m === 0 ? `${h} h` : `${h} h ${m} min`;
+}
+
 function formatRate(value: number | null | undefined): string {
     return `${(Number(value) || 0).toFixed(2)} zł/h`;
 }
@@ -90,7 +97,7 @@ export default function UsersPage() {
                                 <TableCell>{user.role}</TableCell>
                                 <TableCell>{formatRate(user.hourly_rate)}</TableCell>
                                 <TableCell>{formatRate(user.overtime_rate)}</TableCell>
-                                <TableCell>{((Number(user.daily_limit_minutes) || 480) / 60).toFixed(1).replace('.0', '')} h</TableCell>
+                                <TableCell>{formatLimit(user.daily_limit_minutes)}</TableCell>
                                 <TableCell>
                                     <Button
                                         variant={user.is_active ? "default" : "outline"}
