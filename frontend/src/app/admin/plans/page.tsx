@@ -22,7 +22,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { superAdminApi } from '@/lib/api';
+import { superAdminApi, getApiErrorMessage } from '@/lib/api';
 import { toast } from 'sonner';
 import { Plus, Trash2, Edit2, Archive } from 'lucide-react';
 
@@ -66,7 +66,7 @@ export default function PlansPage() {
             setModules(modulesData);
         } catch (error) {
             console.error(error);
-            toast.error('Błąd pobierania danych');
+            toast.error('Błąd pobierania danych', { description: getApiErrorMessage(error, 'Sprawdź połączenie i spróbuj ponownie.') });
         } finally {
             setLoading(false);
         }
@@ -127,7 +127,7 @@ export default function PlansPage() {
             fetchData();
         } catch (error) {
             console.error(error);
-            toast.error('Błąd zapisu planu');
+            toast.error('Błąd zapisu planu', { description: getApiErrorMessage(error, 'Sprawdź połączenie i spróbuj ponownie.') });
         }
     };
 
@@ -139,7 +139,7 @@ export default function PlansPage() {
             fetchData();
         } catch (error) {
             console.error(error);
-            toast.error('Błąd usuwania planu');
+            toast.error('Błąd usuwania planu', { description: getApiErrorMessage(error, 'Sprawdź połączenie i spróbuj ponownie.') });
         }
     };
 
@@ -175,7 +175,7 @@ export default function PlansPage() {
             fetchData();
         } catch (error) {
             console.error(error);
-            toast.error('Błąd zapisu modułu');
+            toast.error('Błąd zapisu modułu', { description: getApiErrorMessage(error, 'Sprawdź połączenie i spróbuj ponownie.') });
         }
     };
 
@@ -187,7 +187,7 @@ export default function PlansPage() {
             fetchData();
         } catch (error) {
             console.error(error);
-            toast.error('Błąd usuwania modułu');
+            toast.error('Błąd usuwania modułu', { description: getApiErrorMessage(error, 'Sprawdź połączenie i spróbuj ponownie.') });
         }
     };
 

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { api } from '@/lib/api';
+import { api, getApiErrorMessage } from '@/lib/api';
 import { toast } from 'sonner';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { LogIn, LogOut, Edit, Trash2 } from 'lucide-react';
@@ -79,7 +79,7 @@ export function ActivityFeed() {
             const response = await api.get('/activity/feed');
             setEvents(response.data);
         } catch (error) {
-            toast.error('Błąd', { description: 'Nie udało się pobrać aktywności.' });
+            toast.error('Błąd', { description: getApiErrorMessage(error, 'Nie udało się pobrać aktywności.') });
         } finally {
             setIsLoading(false);
         }

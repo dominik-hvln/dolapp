@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
-import { api } from '@/lib/api';
+import { api, getApiErrorMessage } from '@/lib/api';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -35,7 +35,7 @@ export default function LocationCodesPage() {
             const response = await api.get('/location-qr-codes');
             setCodes(response.data);
         } catch (error) {
-            toast.error('Błąd', { description: 'Nie udało się pobrać kodów ogólnych.' });
+            toast.error('Błąd', { description: getApiErrorMessage(error, 'Nie udało się pobrać kodów ogólnych.') });
         } finally {
             setIsLoading(false);
         }
@@ -57,7 +57,7 @@ export default function LocationCodesPage() {
             setIsAddDialogOpen(false);
             fetchCodes();
         } catch (error) {
-            toast.error('Błąd', { description: 'Nie udało się dodać kodu.' });
+            toast.error('Błąd', { description: getApiErrorMessage(error, 'Nie udało się dodać kodu.') });
         }
     };
 

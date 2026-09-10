@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Capacitor } from '@capacitor/core';
 import { toast } from 'sonner';
 import { Geolocation } from '@capacitor/geolocation';
-import { api } from '@/lib/api';
+import { api, getApiErrorMessage } from '@/lib/api';
 import { Network } from '@capacitor/network';
 import { Preferences } from '@capacitor/preferences';
 import { Scanner as WebScanner, IDetectedBarcode } from '@yudiel/react-qr-scanner';
@@ -105,7 +105,7 @@ function EmployeeDashboard() {
             setAvailableTasks(Array.isArray(tasksRes.data) ? tasksRes.data : []);
         } catch (error) {
             console.error('[fetchData] Błąd:', error);
-            toast.error('Nie udało się pobrać statusu.');
+            toast.error('Nie udało się pobrać statusu.', { description: getApiErrorMessage(error, 'Sprawdź połączenie i spróbuj ponownie.') });
             setActiveEntry(null);
         } finally {
             setIsLoading(false);

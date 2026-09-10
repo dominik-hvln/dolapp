@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { useParams } from 'next/navigation';
-import { api } from '@/lib/api';
+import { api, getApiErrorMessage } from '@/lib/api';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -72,7 +72,7 @@ export default function ProjectDetailsPage() {
             }
             setResolvedAddress(projectRes.data.address || '');
         } catch (error) {
-            toast.error('Błąd', { description: 'Nie udało się pobrać danych projektu.' });
+            toast.error('Błąd', { description: getApiErrorMessage(error, 'Nie udało się pobrać danych projektu.') });
         } finally {
             setIsLoading(false);
         }
@@ -122,7 +122,7 @@ export default function ProjectDetailsPage() {
 
             toast.success('Sukces!', { description: 'Strefa geofence została zaktualizowana.' });
         } catch (error) {
-            toast.error('Błąd', { description: 'Nie udało się zapisać strefy.' });
+            toast.error('Błąd', { description: getApiErrorMessage(error, 'Nie udało się zapisać strefy.') });
         }
     };
 
@@ -141,7 +141,7 @@ export default function ProjectDetailsPage() {
                 toast.error('Nie znaleziono adresu', { description: 'Spróbuj wpisać bardziej szczegółowy adres.' });
             }
         } catch (error) {
-            toast.error('Błąd wyszukiwania', { description: 'Nie udało się połączyć z usługą geolokalizacji.' });
+            toast.error('Błąd wyszukiwania', { description: getApiErrorMessage(error, 'Nie udało się połączyć z usługą geolokalizacji.') });
         } finally {
             setIsSearching(false);
         }
@@ -153,7 +153,7 @@ export default function ProjectDetailsPage() {
             const response = await api.post(`/tasks/in-project/${projectId}/${taskId}/qr-code`);
             setSelectedTaskQr(response.data.code_value);
         } catch (error) {
-            toast.error('Błąd', { description: 'Nie udało się wygenerować kodu QR.' });
+            toast.error('Błąd', { description: getApiErrorMessage(error, 'Nie udało się wygenerować kodu QR.') });
         }
     };
 

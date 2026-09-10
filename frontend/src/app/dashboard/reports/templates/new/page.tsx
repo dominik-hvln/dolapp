@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { api } from '@/lib/api';
+import { api, getApiErrorMessage } from '@/lib/api';
 import { TemplateBuilder, TemplateField } from '@/components/reports/TemplateBuilder';
 import { LayoutBuilder, LayoutRow } from '@/components/reports/LayoutBuilder';
 import { Button } from '@/components/ui/button';
@@ -76,7 +76,7 @@ export default function NewTemplatePage() {
             router.push('/dashboard/reports/templates');
         } catch (error) {
             console.error(error);
-            toast.error('Nie udało się zapisać szablonu');
+            toast.error('Nie udało się zapisać szablonu', { description: getApiErrorMessage(error, 'Sprawdź połączenie i spróbuj ponownie.') });
         } finally {
             setLoading(false);
         }

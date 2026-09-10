@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { superAdminApi } from '@/lib/api';
+import { superAdminApi, getApiErrorMessage } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -27,7 +27,7 @@ export default function CompaniesPage() {
             setCompanies(data);
         } catch (error) {
             console.error(error);
-            toast.error('Błąd pobierania firm');
+            toast.error('Błąd pobierania firm', { description: getApiErrorMessage(error, 'Sprawdź połączenie i spróbuj ponownie.') });
         } finally {
             setLoading(false);
         }
@@ -41,7 +41,7 @@ export default function CompaniesPage() {
             setNewCompany({ name: '' });
             fetchCompanies();
         } catch (error) {
-            toast.error('Błąd tworzenia firmy');
+            toast.error('Błąd tworzenia firmy', { description: getApiErrorMessage(error, 'Sprawdź połączenie i spróbuj ponownie.') });
         }
     };
 

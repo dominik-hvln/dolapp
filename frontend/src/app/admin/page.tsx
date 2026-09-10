@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { superAdminApi } from '@/lib/api';
+import { superAdminApi, getApiErrorMessage } from '@/lib/api';
 import { toast } from 'sonner';
 
 export default function AdminDashboardPage() {
@@ -23,7 +23,7 @@ export default function AdminDashboardPage() {
             setStats(data);
         } catch (error) {
             console.error(error);
-            toast.error('Błąd pobierania statystyk');
+            toast.error('Błąd pobierania statystyk', { description: getApiErrorMessage(error, 'Sprawdź połączenie i spróbuj ponownie.') });
         } finally {
             setLoading(false);
         }

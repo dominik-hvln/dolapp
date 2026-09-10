@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState, useRef } from 'react';
-import { api } from '@/lib/api';
+import { api, getApiErrorMessage } from '@/lib/api';
 import QRCode from 'react-qr-code';
 import { Button } from '@/components/ui/button';
 import {
@@ -73,7 +73,7 @@ export default function ProjectsPage() {
             setSelectedProjectQr(response.data.code_value);
         } catch (error) {
             console.error(error);
-            toast.error('Błąd', { description: 'Nie udało się wygenerować kodu QR.' });
+            toast.error('Błąd', { description: getApiErrorMessage(error, 'Nie udało się wygenerować kodu QR.') });
         }
     };
 

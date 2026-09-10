@@ -1,7 +1,7 @@
 'use client';
 
 import {useEffect, useState, useCallback, useMemo} from 'react'; // Dodaj useCallback
-import { api } from '@/lib/api';
+import { api, getApiErrorMessage } from '@/lib/api';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -165,7 +165,7 @@ export default function TimeEntriesPage() {
 
         } catch (error) {
             console.error("Błąd podczas generowania PDF:", error);
-            toast.error('Błąd', { description: 'Nie udało się wygenerować PDF. Sprawdź, czy plik czcionki jest dostępny.' });
+            toast.error('Błąd', { description: getApiErrorMessage(error, 'Nie udało się wygenerować PDF. Sprawdź, czy plik czcionki jest dostępny.') });
         }
     };
 

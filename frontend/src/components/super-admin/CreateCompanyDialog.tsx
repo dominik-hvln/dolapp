@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { api } from '@/lib/api';
+import { api, getApiErrorMessage } from '@/lib/api';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -31,7 +31,7 @@ export function CreateCompanyDialog({ open, onOpenChange, onSuccess }: CreateCom
             onOpenChange(false); // Zamknij modal
         } catch (error) {
             console.error(error);
-            toast.error('Nie udało się utworzyć firmy');
+            toast.error('Nie udało się utworzyć firmy', { description: getApiErrorMessage(error, 'Sprawdź połączenie i spróbuj ponownie.') });
         } finally {
             setLoading(false);
         }

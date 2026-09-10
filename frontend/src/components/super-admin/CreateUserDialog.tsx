@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { api } from '@/lib/api';
+import { api, getApiErrorMessage } from '@/lib/api';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -38,7 +38,7 @@ export function CreateUserDialog({ open, onOpenChange, onSuccess }: CreateUserDi
         if (open) {
             api.get('/super-admin/companies')
                 .then((res) => setCompanies(res.data))
-                .catch(() => toast.error('Nie udało się pobrać listy firm'));
+                .catch((error: unknown) => toast.error('Nie udało się pobrać listy firm', { description: getApiErrorMessage(error, 'Sprawdź połączenie i spróbuj ponownie.') }));
         }
     }, [open]);
 

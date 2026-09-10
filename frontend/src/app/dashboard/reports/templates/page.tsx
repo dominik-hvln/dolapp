@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { api } from '@/lib/api';
+import { api, getApiErrorMessage } from '@/lib/api';
 import { useAuthStore } from '@/store/auth.store';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -47,7 +47,7 @@ export default function TemplatesListPage() {
                 setTemplates(response.data);
             } catch (error) {
                 console.error(error);
-                toast.error('Nie udało się pobrać listy szablonów');
+                toast.error('Nie udało się pobrać listy szablonów', { description: getApiErrorMessage(error, 'Sprawdź połączenie i spróbuj ponownie.') });
             } finally {
                 setLoading(false);
             }

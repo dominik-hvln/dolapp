@@ -6,7 +6,7 @@ import * as z from 'zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { api } from '@/lib/api';
+import { api, getApiErrorMessage } from '@/lib/api';
 import { toast } from 'sonner';
 
 const formSchema = z.object({
@@ -32,7 +32,7 @@ export function CreateTaskForm({ projectId, onSuccess }: CreateTaskFormProps) {
             toast.success('Sukces!', { description: 'Nowe zlecenie zostało dodane.' });
             onSuccess();
         } catch (error) {
-            toast.error('Błąd', { description: 'Nie udało się dodać zlecenia.' });
+            toast.error('Błąd', { description: getApiErrorMessage(error, 'Nie udało się dodać zlecenia.') });
         }
     }
 

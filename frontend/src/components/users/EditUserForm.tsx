@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { toast } from 'sonner';
-import { api } from '@/lib/api';
+import { api, getApiErrorMessage } from '@/lib/api';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const formSchema = z.object({
@@ -76,7 +76,7 @@ export function EditUserForm({ user, onSuccess }: { user: EditableUser; onSucces
             toast.success('Sukces!', { description: 'Dane pracownika zostały zaktualizowane.' });
             onSuccess();
         } catch (error) {
-            toast.error('Błąd', { description: 'Nie udało się zaktualizować pracownika.' });
+            toast.error('Błąd', { description: getApiErrorMessage(error, 'Nie udało się zaktualizować pracownika.') });
         }
     }
 

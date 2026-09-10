@@ -6,7 +6,7 @@ import * as z from 'zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { api } from '@/lib/api';
+import { api, getApiErrorMessage } from '@/lib/api';
 import { toast } from 'sonner';
 import { Textarea } from '@/components/ui/textarea';
 
@@ -60,7 +60,7 @@ export function EditEntryForm({ entry, onSuccess }: EditEntryFormProps) {
             toast.success('Sukces!', { description: 'Wpis został zaktualizowany.' });
             onSuccess();
         } catch (error) {
-            toast.error('Błąd', { description: 'Nie udało się zaktualizować wpisu.' });
+            toast.error('Błąd', { description: getApiErrorMessage(error, 'Nie udało się zaktualizować wpisu.') });
         }
     }
 

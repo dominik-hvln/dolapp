@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { api } from '@/lib/api';
+import { api, getApiErrorMessage } from '@/lib/api';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -36,7 +36,7 @@ export function AssignUserForm({ taskId, companyUsers }: AssignUserFormProps) {
             const response = await api.get(`/tasks/${taskId}/assignments`);
             setAssignedUsers(response.data);
         } catch (error) {
-            toast.error('Błąd', { description: 'Nie udało się pobrać przypisanych użytkowników.' });
+            toast.error('Błąd', { description: getApiErrorMessage(error, 'Nie udało się pobrać przypisanych użytkowników.') });
         } finally {
             setIsLoading(false);
         }
@@ -54,7 +54,7 @@ export function AssignUserForm({ taskId, companyUsers }: AssignUserFormProps) {
             fetchAssignedUsers(); // Odśwież listę
             setOpen(false); // Zamknij popover
         } catch (error) {
-            toast.error('Błąd', { description: 'Nie udało się przypisać pracownika.' });
+            toast.error('Błąd', { description: getApiErrorMessage(error, 'Nie udało się przypisać pracownika.') });
         }
     };
 
@@ -66,7 +66,7 @@ export function AssignUserForm({ taskId, companyUsers }: AssignUserFormProps) {
             toast.success('Usunięto pracownika');
             fetchAssignedUsers(); // Odśwież listę
         } catch (error) {
-            toast.error('Błąd', { description: 'Nie udało się usunąć przypisania.' });
+            toast.error('Błąd', { description: getApiErrorMessage(error, 'Nie udało się usunąć przypisania.') });
         }
     };
 

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { superAdminApi } from '@/lib/api';
+import { superAdminApi, getApiErrorMessage } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { Check, X, Shield, Calendar, Settings } from 'lucide-react';
@@ -34,7 +34,7 @@ export default function CompanyDetailsPage() {
             setAllModules(modsData);
         } catch (error) {
             console.error(error);
-            toast.error('Błąd pobierania danych firmy');
+            toast.error('Błąd pobierania danych firmy', { description: getApiErrorMessage(error, 'Sprawdź połączenie i spróbuj ponownie.') });
         } finally {
             setLoading(false);
         }
@@ -46,7 +46,7 @@ export default function CompanyDetailsPage() {
             toast.success('Plan zmieniony pomyślnie');
             fetchData(); // Refresh to show new limits/modules
         } catch (error) {
-            toast.error('Błąd zmiany planu');
+            toast.error('Błąd zmiany planu', { description: getApiErrorMessage(error, 'Sprawdź połączenie i spróbuj ponownie.') });
         }
     };
 
@@ -56,7 +56,7 @@ export default function CompanyDetailsPage() {
             toast.success(`Moduł ${!currentState ? 'włączony' : 'wyłączony'}`);
             fetchData();
         } catch (error) {
-            toast.error('Błąd zmiany modułu');
+            toast.error('Błąd zmiany modułu', { description: getApiErrorMessage(error, 'Sprawdź połączenie i spróbuj ponownie.') });
         }
     };
 

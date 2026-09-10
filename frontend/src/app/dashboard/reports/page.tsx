@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { api } from '@/lib/api';
+import { api, getApiErrorMessage } from '@/lib/api';
 import { useAuthStore } from '@/store/auth.store';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -46,7 +46,7 @@ export default function ReportsListPage() {
                 setReports(data);
             } catch (error) {
                 console.error(error);
-                toast.error('Nie udało się pobrać listy raportów');
+                toast.error('Nie udało się pobrać listy raportów', { description: getApiErrorMessage(error, 'Sprawdź połączenie i spróbuj ponownie.') });
             } finally {
                 setLoading(false);
             }
@@ -77,7 +77,7 @@ export default function ReportsListPage() {
             toast.success('Pobrano plik PDF');
         } catch (error) {
             console.error(error);
-            toast.error('Błąd pobierania PDF', { description: 'Spróbuj ponownie później.' });
+            toast.error('Błąd pobierania PDF', { description: getApiErrorMessage(error, 'Spróbuj ponownie później.') });
         }
     };
 

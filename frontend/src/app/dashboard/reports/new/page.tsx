@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { api } from '@/lib/api';
+import { api, getApiErrorMessage } from '@/lib/api';
 import { useAuthStore } from '@/store/auth.store';
 // ✅ IMPORTUJEMY AnswerValue, żeby typy były zgodne
 import { ReportRenderer, AnswerValue } from '@/components/reports/ReportRenderer';
@@ -46,7 +46,7 @@ export default function NewReportPage() {
                 setTemplates(data);
             } catch (error) {
                 console.error(error);
-                toast.error('Błąd pobierania szablonów');
+                toast.error('Błąd pobierania szablonów', { description: getApiErrorMessage(error, 'Sprawdź połączenie i spróbuj ponownie.') });
             } finally {
                 setLoading(false);
             }
@@ -80,7 +80,7 @@ export default function NewReportPage() {
             router.push('/dashboard/reports');
         } catch (error) {
             console.error(error);
-            toast.error('Nie udało się zapisać raportu');
+            toast.error('Nie udało się zapisać raportu', { description: getApiErrorMessage(error, 'Sprawdź połączenie i spróbuj ponownie.') });
         } finally {
             setSubmitting(false);
         }

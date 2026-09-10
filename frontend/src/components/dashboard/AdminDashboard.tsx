@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { api } from '@/lib/api';
+import { api, getApiErrorMessage } from '@/lib/api';
 import { toast } from 'sonner';
 import { ActivityFeed } from './ActivityFeed';
 import { LaborCosts } from './LaborCosts';
@@ -107,7 +107,7 @@ export function AdminDashboard() {
                 const response = await api.get('/dashboard/summary');
                 setSummary(response.data);
             } catch (error) {
-                toast.error('Błąd', { description: 'Nie udało się pobrać podsumowania.' });
+                toast.error('Błąd', { description: getApiErrorMessage(error, 'Nie udało się pobrać podsumowania.') });
             } finally {
                 setIsLoading(false);
             }

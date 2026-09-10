@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { api } from '@/lib/api';
+import { api, getApiErrorMessage } from '@/lib/api';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
@@ -38,7 +38,7 @@ export function EntryDetailsDialog({ entry, onClose }: EntryDetailsDialogProps) 
             .then((response) => { if (!cancelled) setAuditLogs(response.data); })
             .catch((error: unknown) => {
                 console.error('Błąd pobierania historii wpisu:', error);
-                if (!cancelled) toast.error('Błąd', { description: 'Nie udało się pobrać historii zmian.' });
+                if (!cancelled) toast.error('Błąd', { description: getApiErrorMessage(error, 'Nie udało się pobrać historii zmian.') });
             })
             .finally(() => { if (!cancelled) setIsLoadingLogs(false); });
         return () => { cancelled = true; };

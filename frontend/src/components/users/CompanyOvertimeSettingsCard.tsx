@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { AxiosError } from 'axios';
 import { toast } from 'sonner';
-import { api } from '@/lib/api';
+import { api, getApiErrorMessage } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -35,7 +35,7 @@ export function CompanyOvertimeSettingsCard({ tasks, onSettingsChange }: Company
             })
             .catch((error: unknown) => {
                 console.error('Błąd pobierania ustawień firmy:', error);
-                if (!cancelled) toast.error('Błąd', { description: 'Nie udało się pobrać ustawień nadgodzin firmy.' });
+                if (!cancelled) toast.error('Błąd', { description: getApiErrorMessage(error, 'Nie udało się pobrać ustawień nadgodzin firmy.') });
             })
             .finally(() => { if (!cancelled) setIsLoading(false); });
         return () => { cancelled = true; };
@@ -59,11 +59,7 @@ export function CompanyOvertimeSettingsCard({ tasks, onSettingsChange }: Company
             onSettingsChange?.(data);
             toast.success('Sukces!', { description: 'Ustawienia nadgodzin zostały zapisane.' });
         } catch (error) {
-            const axiosError = error as AxiosError<{ message?: string | string[] }>;
-            const message = axiosError.response?.data?.message;
-            toast.error('Błąd', {
-                description: Array.isArray(message) ? message.join(', ') : message || 'Nie udało się zapisać ustawień.',
-            });
+            toast.error('Błąd', { description: getApiErrorMessage(error, 'Nie udało się zapisać ustawień.') });
         } finally {
             setIsSaving(false);
         }

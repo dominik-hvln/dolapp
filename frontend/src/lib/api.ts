@@ -199,3 +199,19 @@ export const stripeApi = {
         return data;
     },
 };
+/**
+ * Wyciąga czytelny komunikat błędu z odpowiedzi API (NestJS: { message: string | string[] }).
+ * Gdy nie ma odpowiedzi (sieć, timeout) albo brak treści, zwraca fallback.
+ */
+export function getApiErrorMessage(error: unknown, fallback: string): string {
+    if (axios.isAxiosError(error)) {
+        const data = error.response?.data as { message?: unknown; error?: unknown } | undefined;
+        const raw = data?.message ?? data?.error;
+        const msg = Array.isArray(raw) ? raw.join(' ') : raw;
+        if (typeof msg === 'string' && msg.trim().length > 0) return msg;
+        if (!error.response) return 'Brak połączenia z serwerem.';
+        return `${fallback} (HTTP ${error.response.status})`;
+    }
+    if (error instanceof Error && error.message) return error.message;
+    return fallback;
+}
