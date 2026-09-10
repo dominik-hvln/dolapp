@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { toast } from 'sonner';
+import axios from 'axios';
 import { api } from '@/lib/api';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
@@ -37,8 +38,11 @@ export function CreateUserForm({ onSuccess }: { onSuccess: () => void }) {
             });
             onSuccess();
         } catch (error) {
-            toast.error('Błąd', {
-                description: 'Nie udało się dodać pracownika.',
+            const data = axios.isAxiosError(error) ? error.response?.data : undefined;
+            const raw = data?.message ?? data?.error;
+            const message = Array.isArray(raw) ? raw.join(' ') : raw;
+            toast.error('Nie udało się dodać pracownika', {
+                description: typeof message === 'string' && message.length > 0 ? message : 'Nieznany błąd. Spróbuj ponownie.',
             });
         }
     }
