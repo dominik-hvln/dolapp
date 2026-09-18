@@ -27,7 +27,8 @@ export const navLinks: NavLink[] = [
     { href: '/dashboard/activity', label: 'Aktywność', icon: Activity, roles: ['admin', 'manager'] },
     { href: '/dashboard/entries', label: 'Ewidencja Czasu', icon: Clock, roles: ['admin', 'manager'] },
     { href: '/dashboard/projects', label: 'Projekty', icon: FolderKanban, moduleCode: 'projects', roles: ['admin', 'manager'] },
-    { href: '/dashboard/reports', label: 'Raporty', icon: FileText, moduleCode: 'reports', roles: ['admin', 'manager'] },
+    // Raporty (przeniesione z Effixy) są wyłączone dla klientów - dostęp tylko dla super_admin
+    { href: '/dashboard/reports', label: 'Raporty', icon: FileText, moduleCode: 'reports', roles: ['super_admin'] },
     { href: '/dashboard/users', label: 'Użytkownicy', icon: Users, roles: ['admin', 'manager'] },
     { href: '/dashboard/locations', label: 'Kody Ogólne', icon: MapPin, moduleCode: 'geolocation', roles: ['admin', 'manager'] },
     {
