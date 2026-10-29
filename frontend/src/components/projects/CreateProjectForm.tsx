@@ -7,9 +7,8 @@ import * as z from 'zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { api } from '@/lib/api';
+import { api, getApiErrorMessage } from '@/lib/api';
 import { toast } from 'sonner';
-import { AxiosError } from 'axios';
 
 const formSchema = z.object({
     name: z.string().min(3, { message: 'Nazwa musi mieć co najmniej 3 znaki.' }),
@@ -26,6 +25,8 @@ export function CreateProjectForm({ onProjectCreated }: CreateProjectFormProps) 
         defaultValues: { name: '', description: '' },
     });
 
+    const projectName = form.watch('name').trim();
+
     async function onSubmit(values: z.infer<typeof formSchema>) {
         try {
             await api.post('/projects', values);
@@ -34,10 +35,7 @@ export function CreateProjectForm({ onProjectCreated }: CreateProjectFormProps) 
             });
             onProjectCreated();
         } catch (error) {
-            const description =
-                error instanceof AxiosError
-                    ? error.response?.data?.message
-                    : 'Nie udało się utworzyć projektu.';
+            const description = getApiErrorMessage(error, 'Nie udało się utworzyć projektu.');
 
             toast.error('Błąd', {
                 description: description,
@@ -61,6 +59,11 @@ export function CreateProjectForm({ onProjectCreated }: CreateProjectFormProps) 
                         </FormItem>
                     )}
                 />
+                <p className="text-sm text-muted-foreground">
+                    {projectName
+                        ? `Automatycznie utworzymy też projekt „${projectName} nadgodziny”, który pracownik dostaje po przepracowaniu swojego limitu godzin.`
+                        : 'Automatycznie utworzymy też projekt nadgodzin, który pracownik dostaje po przepracowaniu swojego limitu godzin.'}
+                </p>
                 <FormField
                     control={form.control}
                     name="description"

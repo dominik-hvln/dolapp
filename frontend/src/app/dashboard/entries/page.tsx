@@ -1,6 +1,7 @@
 'use client';
 
-import {useEffect, useState, useCallback, useMemo} from 'react'; // Dodaj useCallback
+import { Suspense, useEffect, useState, useCallback, useMemo, useRef } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { api, getApiErrorMessage } from '@/lib/api';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -8,16 +9,15 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { format } from 'date-fns';
-import { Calendar as CalendarIcon, MoreHorizontal, AlertTriangle, MapPinOff } from 'lucide-react';
+import { endOfDay, format, isValid } from 'date-fns';
+import { Calendar as CalendarIcon, MoreHorizontal, AlertTriangle } from 'lucide-react';
 import { DateRange } from 'react-day-picker';
 import {Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle} from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { EditEntryForm } from '@/components/time-entries/EditEntryForm';
 import { EntryDetailsDialog } from '@/components/time-entries/EntryDetailsDialog';
-import { TimeEntry, AuditLog, entryDurationMinutes, entryPausedMinutes, formatMinutes } from '@/lib/time-entries';
-import { AxiosError } from 'axios';
+import { TimeEntry, AuditLog, entryDurationMinutes, entryPausedMinutes, entryOutsideMinutes, entryOutsideCount, formatMinutes, TimeEntryFilterProject, summarizeEntryDays, warsawTime } from '@/lib/time-entries';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label'; // Poprawiony import Label
@@ -29,11 +29,51 @@ import { FileDown } from 'lucide-react';
 interface User { id: string; first_name: string; last_name: string; }
 
 export default function TimeEntriesPage() {
+    return <Suspense fallback={<p>Ładowanie ewidencji...</p>}><TimeEntriesContent /></Suspense>;
+}
+
+function TimeEntriesContent() {
     const [entries, setEntries] = useState<TimeEntry[]>([]);
     const [users, setUsers] = useState<User[]>([]);
     const [isLoading, setIsLoading] = useState(true);
-    const [date, setDate] = useState<DateRange | undefined>();
-    const [selectedUserId, setSelectedUserId] = useState<string>('all');
+    const searchParams = useSearchParams();
+    const router = useRouter();
+    const pathname = usePathname();
+    const [filterProjects, setFilterProjects] = useState<TimeEntryFilterProject[]>([]);
+    const requestNumber = useRef(0);
+    const selectedUserId = searchParams.get('userId') || 'all';
+    const selectedProjectId = searchParams.get('projectId') || 'all';
+    const selectedTaskId = selectedProjectId === 'all' ? 'all' : searchParams.get('taskId') || 'all';
+    const rawKind = searchParams.get('kind');
+    const selectedKind = rawKind === 'regular' || rawKind === 'overtime' ? rawKind : 'all';
+    const dateFrom = searchParams.get('dateFrom');
+    const dateTo = searchParams.get('dateTo');
+    const date = useMemo<DateRange | undefined>(() => {
+        const from = dateFrom ? new Date(dateFrom) : undefined;
+        const to = dateTo ? new Date(dateTo) : undefined;
+        return from && isValid(from) ? { from, to: to && isValid(to) ? to : undefined } : undefined;
+    }, [dateFrom, dateTo]);
+    const updateFilters = (values: Record<string, string | undefined>) => {
+        const params = new URLSearchParams(searchParams.toString());
+        for (const [key, value] of Object.entries(values)) {
+            if (!value || value === 'all') params.delete(key);
+            else params.set(key, value);
+        }
+        router.replace(`${pathname}${params.size ? `?${params}` : ''}`, { scroll: false });
+    };
+    const setDate = (range: DateRange | undefined) => updateFilters({
+        dateFrom: range?.from?.toISOString(),
+        dateTo: range?.from ? endOfDay(range.to ?? range.from).toISOString() : undefined,
+    });
+    const selectedProject = filterProjects.find((project) => project.id === selectedProjectId);
+    const query = new URLSearchParams();
+    if (date?.from) query.set('dateFrom', date.from.toISOString());
+    if (date?.to) query.set('dateTo', date.to.toISOString());
+    if (selectedUserId !== 'all') query.set('userId', selectedUserId);
+    if (selectedProjectId !== 'all') query.set('projectId', selectedProjectId);
+    if (selectedTaskId !== 'all') query.set('taskId', selectedTaskId);
+    if (selectedKind !== 'all') query.set('kind', selectedKind);
+    const queryString = query.toString();
     const [entryToEdit, setEntryToEdit] = useState<TimeEntry | null>(null);
     const [entryToDelete, setEntryToDelete] = useState<TimeEntry | null>(null);
     const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
@@ -41,7 +81,7 @@ export default function TimeEntriesPage() {
     const [deleteReason, setDeleteReason] = useState('');
     const [entryDetails, setEntryDetails] = useState<TimeEntry | null>(null);
 
-    // Jedno źródło prawdy dla tabeli, sumy i eksportów: duration_minutes z backendu (czas pomniejszony o przerwy poza strefą).
+    // Tabela, podsumowanie i eksporty korzystają z tego samego zestawu wpisów.
     const totalDurationMinutes = useMemo(
         () => entries.reduce((total, entry) => total + entryDurationMinutes(entry), 0),
         [entries],
@@ -51,11 +91,16 @@ export default function TimeEntriesPage() {
         [entries],
     );
 
+    const totalOutsideMinutes = useMemo(() => entries.reduce((total, entry) => total + entryOutsideMinutes(entry), 0), [entries]);
+    const totalOutsideCount = useMemo(() => entries.reduce((total, entry) => total + entryOutsideCount(entry), 0), [entries]);
+    const totalOvertimeMinutes = useMemo(() => entries.reduce((total, entry) => total + (entry.is_overtime ? entryDurationMinutes(entry) : 0), 0), [entries]);
+    const days = useMemo(() => summarizeEntryDays(entries), [entries]);
+
     const totalHours = Math.floor(totalDurationMinutes / 60);
     const totalMinutes = totalDurationMinutes % 60;
 
     const handleExportCSV = () => {
-        const headers = "Pracownik;Projekt;Zlecenie;Data Rozpoczęcia;Czas Rozpoczęcia;Data Zakończenia;Czas Zakończenia;Czas Trwania (min);Poza strefą (min);Liczba przerw;Uwagi\n";
+        const headers = 'Pracownik;Projekt;Zlecenie;Data Rozpoczęcia;Czas Rozpoczęcia;Data Zakończenia;Czas Zakończenia;Czas Trwania (min);Rodzaj;Poza strefą (min);Przerwy poza strefą;Uwagi\n';
 
         // Escapowanie cudzysłowów i ochrona przed CSV/formula injection (komórki zaczynające się od = + - @).
         const csvCell = (value: string) => {
@@ -80,8 +125,9 @@ export default function TimeEntriesPage() {
                 end ? end.toLocaleDateString('pl-PL') : '-',
                 end ? end.toLocaleTimeString('pl-PL') : '-',
                 durationMin,
-                entryPausedMinutes(entry),
-                (entry.geofence_pauses ?? []).length,
+                entry.is_overtime ? 'Nadgodziny' : 'Podstawowy',
+                entryOutsideMinutes(entry),
+                entryOutsideCount(entry),
                 csvCell(notes)
             ].join(';');
         }).join('\n');
@@ -92,11 +138,12 @@ export default function TimeEntriesPage() {
         link.href = URL.createObjectURL(blob);
         link.download = 'raport_czasu_pracy.csv';
         link.click();
+        URL.revokeObjectURL(link.href);
     };
 
     const handleExportPDF = async () => {
         // 1. Funkcja musi być teraz asynchroniczna
-        const doc = new jsPDF();
+        const doc = new jsPDF({ orientation: 'landscape' });
 
         try {
             // 2. Pobierz plik czcionki z folderu /public
@@ -108,11 +155,11 @@ export default function TimeEntriesPage() {
 
             // 3. Przeczytaj czcionkę jako Base64
             const reader = new FileReader();
-            reader.readAsDataURL(fontBlob);
 
             // Używamy Promise, aby poczekać na wczytanie pliku
-            await new Promise<void>((resolve) => {
-                reader.onloadend = () => {
+            await new Promise<void>((resolve, reject) => {
+                reader.onerror = () => reject(new Error('Nie udało się odczytać czcionki.'));
+                reader.onload = () => {
                     // Otrzymujemy string base64
                     const fontBase64 = (reader.result as string).split(',')[1];
 
@@ -123,6 +170,7 @@ export default function TimeEntriesPage() {
 
                     resolve();
                 };
+                reader.readAsDataURL(fontBlob);
             });
 
             // 5. Cała reszta logiki generowania PDF (teraz z poprawną czcionką)
@@ -130,7 +178,7 @@ export default function TimeEntriesPage() {
             doc.setFontSize(10);
             doc.text(`Filtry: ${date?.from ? format(date.from, 'dd.MM.yyyy') : ''} - ${date?.to ? format(date.to, 'dd.MM.yyyy') : ''}`, 14, 25);
 
-            const tableColumn = ["Pracownik", "Projekt / Zlecenie", "Start", "Koniec", "Czas Trwania", "Poza strefą"];
+            const tableColumn = ['Pracownik', 'Projekt / Zlecenie', 'Start', 'Koniec', 'Czas pracy', 'Rodzaj', 'Poza strefą (min)', 'Przerwy poza strefą'];
             const tableRows: (string | number)[][] = [];
 
             entries.forEach(entry => {
@@ -140,7 +188,9 @@ export default function TimeEntriesPage() {
                     new Date(entry.start_time).toLocaleString('pl-PL'),
                     entry.end_time ? new Date(entry.end_time).toLocaleString('pl-PL') : '-',
                     formatDuration(entry),
-                    formatPaused(entry)
+                    entry.is_overtime ? 'Nadgodziny' : 'Podstawowy',
+                    entryOutsideMinutes(entry),
+                    entryOutsideCount(entry)
                 ];
                 tableRows.push(row);
             });
@@ -159,7 +209,7 @@ export default function TimeEntriesPage() {
             doc.setFontSize(12);
 
             // Ta linia teraz zadziała poprawnie
-            doc.text(`Łączny czas pracy: ${totalHours}h ${totalMinutes}m (poza strefą: ${formatMinutes(totalPausedMinutes)})`, 14, finalY + 10);
+            doc.text(`Łączny czas pracy: ${totalHours}h ${totalMinutes}m (poza strefą: ${formatMinutes(totalOutsideMinutes)}, wliczone w czas pracy)`, 14, finalY + 10);
 
             doc.save('raport_czasu_pracy.pdf');
 
@@ -170,50 +220,40 @@ export default function TimeEntriesPage() {
     };
 
     const fetchTimeEntries = useCallback(async () => {
+        const currentRequest = ++requestNumber.current;
         setIsLoading(true);
         try {
-            const params = new URLSearchParams();
-            if (date?.from) params.append('dateFrom', date.from.toISOString());
-            if (date?.to) params.append('dateTo', date.to.toISOString());
-            if (selectedUserId && selectedUserId !== 'all') {
-                params.append('userId', selectedUserId);
+            const response = await api.get<TimeEntry[]>(`/time-entries?${queryString}`);
+            if (currentRequest === requestNumber.current) setEntries(response.data);
+        } catch (error) {
+            if (currentRequest === requestNumber.current) {
+                setEntries([]);
+                toast.error(getApiErrorMessage(error, 'Nie udało się pobrać ewidencji.'));
             }
-
-            const response = await api.get(`/time-entries?${params.toString()}`);
-            setEntries(response.data);
-        } catch (error: unknown) {
-            console.error('Błąd fetchTimeEntries:', error);
-            const errorMessage = error instanceof Error ? error.message : 'Nie udało się pobrać ewidencji.';
-            toast.error('Błąd', { description: errorMessage as string });
         } finally {
-            setIsLoading(false);
+            if (currentRequest === requestNumber.current) setIsLoading(false);
         }
-    }, [date, selectedUserId]);
-
-    const fetchUsers = useCallback(async () => {
-        try {
-            const response = await api.get('/users');
-            setUsers(response.data);
-        } catch (error: unknown) { // ✅ Poprawiony typ błędu
-            console.error('Błąd podczas pobierania użytkowników:', error instanceof Error ? error.message : error);
-        }
-    }, []); // Pusta tablica, bo nie ma zależności
+    }, [queryString]);
 
     useEffect(() => {
-        fetchUsers();
+        let cancelled = false;
+        api.get<User[]>('/users')
+            .then(({ data }) => { if (!cancelled) setUsers(data); })
+            .catch((error: unknown) => { if (!cancelled) toast.error(getApiErrorMessage(error, 'Nie udało się pobrać pracowników.')); });
+        api.get<{ projects: TimeEntryFilterProject[] }>('/time-entries/filters')
+            .then(({ data }) => { if (!cancelled) setFilterProjects(data.projects); })
+            .catch((error: unknown) => { if (!cancelled) toast.error(getApiErrorMessage(error, 'Nie udało się pobrać filtrów ewidencji.')); });
+        return () => { cancelled = true; };
+    }, []);
+
+    useEffect(() => {
         fetchTimeEntries();
-    }, [fetchUsers, fetchTimeEntries]); // ✅ Poprawione zależności useEffect
+        return () => { requestNumber.current += 1; };
+    }, [fetchTimeEntries]);
 
     const formatDuration = (entry: TimeEntry) => {
         const label = formatMinutes(entryDurationMinutes(entry));
         return entry.end_time ? label : `${label} (w trakcie)`;
-    };
-
-    const formatPaused = (entry: TimeEntry) => {
-        const pauses = (entry.geofence_pauses ?? []).length;
-        const minutes = entryPausedMinutes(entry);
-        if (!pauses && !minutes) return '-';
-        return `${formatMinutes(minutes)} (${pauses})`;
     };
 
     const handleDelete = async () => {
@@ -224,15 +264,8 @@ export default function TimeEntriesPage() {
             });
             toast.success('Sukces!', { description: 'Wpis został usunięty.' });
             fetchTimeEntries();
-        } catch (error: unknown) { // ✅ POPRAWIONY TYP
-            console.error("Błąd handleDelete:", error); // Dodaj log dla diagnostyki
-            const axiosError = error as AxiosError;
-            // Sprawdź, czy error jest obiektem AxiosError i ma odpowiedź
-            const errorMessage = axiosError.response?.data
-                ? (axiosError.response.data as { message: string })?.message
-                : (error instanceof Error ? error.message : 'Nie udało się usunąć wpisu.'); // Ogólny fallback
-
-            toast.error('Błąd', { description: errorMessage });
+        } catch (error) {
+            toast.error(getApiErrorMessage(error, 'Nie udało się usunąć wpisu.'));
         } finally {
             setEntryToDelete(null);
             setDeleteReason('');
@@ -249,11 +282,8 @@ export default function TimeEntriesPage() {
             const response = await api.get(`/time-entries/${entryId}/audit-logs`);
             setAuditLogs(response.data);
             setIsHistoryOpen(true);
-        } catch (error: unknown) { // ✅ POPRAWIONY TYP
-            console.error("Błąd handleShowHistory:", error); // Dodaj log
-            // ✅ DODANE SPRAWDZENIE INSTANCEOF ERROR
-            const errorMessage = error instanceof Error ? error.message : 'Nie udało się pobrać historii zmian.';
-            toast.error('Błąd', { description: errorMessage });
+        } catch (error) {
+            toast.error(getApiErrorMessage(error, 'Nie udało się pobrać historii zmian.'));
         }
     };
 
@@ -272,20 +302,41 @@ export default function TimeEntriesPage() {
                     <PopoverContent className="w-auto p-0" align="start"><Calendar mode="range" selected={date} onSelect={setDate} numberOfMonths={2} /></PopoverContent>
                 </Popover>
 
-                <Select value={selectedUserId} onValueChange={setSelectedUserId}>
-                    <SelectTrigger className="w-full sm:w-[280px]"><SelectValue placeholder="Filtruj po pracowniku" /></SelectTrigger>
+                <Select value={selectedUserId} onValueChange={(value) => updateFilters({ userId: value })}>
+                    <SelectTrigger aria-label="Pracownik" className="w-full sm:w-[280px]"><SelectValue placeholder="Filtruj po pracowniku" /></SelectTrigger>
                     <SelectContent>
                         <SelectItem value="all">Wszyscy pracownicy</SelectItem>
                         {users.map(user => <SelectItem key={user.id} value={user.id}>{user.first_name} {user.last_name}</SelectItem>)}
                     </SelectContent>
                 </Select>
 
-                <Button onClick={fetchTimeEntries}>Filtruj</Button>
+                <div className="space-y-1">
+                    <Label>Projekt</Label>
+                    <Select value={selectedProjectId} onValueChange={(value) => updateFilters({ projectId: value, taskId: undefined })}>
+                        <SelectTrigger aria-label="Projekt" className="w-full sm:w-[240px]"><SelectValue /></SelectTrigger>
+                        <SelectContent><SelectItem value="all">Wszystkie projekty</SelectItem>{filterProjects.map((project) => <SelectItem key={project.id} value={project.id}>{project.name}</SelectItem>)}</SelectContent>
+                    </Select>
+                </div>
+                <div className="space-y-1">
+                    <Label>Zlecenie</Label>
+                    <Select value={selectedTaskId} disabled={selectedProjectId === 'all'} onValueChange={(value) => updateFilters({ taskId: value })}>
+                        <SelectTrigger aria-label="Zlecenie" className="w-full sm:w-[260px]"><SelectValue /></SelectTrigger>
+                        <SelectContent><SelectItem value="all">Wszystkie zlecenia</SelectItem>{selectedProject?.tasks.map((task) => <SelectItem key={task.id} value={task.id}>{task.name}{task.is_overtime && <Badge variant="secondary" className="ml-2">Nadgodziny</Badge>}</SelectItem>)}</SelectContent>
+                    </Select>
+                </div>
+                <div className="space-y-1">
+                    <Label>Rodzaj</Label>
+                    <Select value={selectedKind} onValueChange={(value) => updateFilters({ kind: value })}>
+                        <SelectTrigger aria-label="Rodzaj" className="w-full sm:w-[200px]"><SelectValue /></SelectTrigger>
+                        <SelectContent><SelectItem value="all">Wszystko</SelectItem><SelectItem value="regular">Czas podstawowy</SelectItem><SelectItem value="overtime">Nadgodziny</SelectItem></SelectContent>
+                    </Select>
+                </div>
+                <Button onClick={fetchTimeEntries} disabled={isLoading}>Filtruj</Button>
                 <div className="flex gap-2 ml-auto">
-                    <Button variant="outline" size="sm" onClick={handleExportCSV}>
+                    <Button variant="outline" size="sm" onClick={handleExportCSV} disabled={isLoading}>
                         <FileDown className="mr-2 h-4 w-4" /> CSV
                     </Button>
-                    <Button variant="outline" size="sm" onClick={handleExportPDF}>
+                    <Button variant="outline" size="sm" onClick={handleExportPDF} disabled={isLoading}>
                         <FileDown className="mr-2 h-4 w-4" /> PDF
                     </Button>
                 </div>
@@ -296,11 +347,23 @@ export default function TimeEntriesPage() {
                 </h3>
                 <p className="text-muted-foreground">
                     Łączny czas pracy: <span className="font-bold text-primary">{totalHours} godzin {totalMinutes} minut</span>
-                    {totalPausedMinutes > 0 && (
-                        <span> (poza strefą: {formatMinutes(totalPausedMinutes)}, nie wliczone)</span>
-                    )}
+                    <span> (poza strefą: {formatMinutes(totalOutsideMinutes)}, wliczone w czas pracy)</span>
+                    {totalPausedMinutes > 0 && <span className="block text-sm">Pauza (stary tryb): {totalPausedMinutes} min</span>}
                 </p>
             </div>
+            <details className="mb-6 rounded-lg border p-4" open>
+                <summary className="cursor-pointer font-semibold">Podsumowanie dni</summary>
+                <Table>
+                    <TableHeader><TableRow><TableHead>Data</TableHead><TableHead>Pracownik</TableHead><TableHead>Rozpoczęcie</TableHead><TableHead>Czas pracy</TableHead><TableHead>w tym nadgodziny</TableHead><TableHead>Poza strefą</TableHead></TableRow></TableHeader>
+                    <TableBody>
+                        {isLoading ? <TableRow><TableCell colSpan={6}>Ładowanie...</TableCell></TableRow> : days.map((day) => (
+                            <TableRow key={day.key}><TableCell>{day.day.split('-').reverse().join('.')}</TableCell><TableCell>{day.employee}</TableCell><TableCell>{warsawTime(day.start)}</TableCell><TableCell>{formatMinutes(day.duration)}</TableCell><TableCell>{formatMinutes(day.overtime)}</TableCell><TableCell title="Wliczone w czas pracy">{day.outsideCount} ({day.outside} min)</TableCell></TableRow>
+                        ))}
+                        {!isLoading && days.length === 0 && <TableRow><TableCell colSpan={6}>Brak wpisów dla wybranych filtrów.</TableCell></TableRow>}
+                        {!isLoading && <TableRow className="font-semibold"><TableCell>Łącznie</TableCell><TableCell /><TableCell /><TableCell>{formatMinutes(totalDurationMinutes)}</TableCell><TableCell>{formatMinutes(totalOvertimeMinutes)}</TableCell><TableCell title="Wliczone w czas pracy">{totalOutsideCount} ({totalOutsideMinutes} min)</TableCell></TableRow>}
+                    </TableBody>
+                </Table>
+            </details>
             <div className="border rounded-lg">
                 <Table>
                     <TableHeader>
@@ -341,6 +404,7 @@ export default function TimeEntriesPage() {
                                     <TableCell>
                                         <div className="flex items-center gap-1">
                                             <span>{entry.project?.name || '-'} / {entry.task?.name || 'Ogólny'}</span>
+                                            {entry.is_overtime && <Badge variant="secondary">Nadgodziny</Badge>}
                                             {entry.switched_by === 'auto_limit' && (
                                                 <TooltipProvider delayDuration={100}>
                                                     <Tooltip>
@@ -359,14 +423,11 @@ export default function TimeEntriesPage() {
                                     <TableCell>{entry.end_time ? new Date(entry.end_time).toLocaleString('pl-PL') : '-'}</TableCell>
                                     <TableCell className="font-medium">{formatDuration(entry)}</TableCell>
                                     <TableCell>
-                                        {(entry.geofence_pauses ?? []).length > 0 || entryPausedMinutes(entry) > 0 ? (
-                                            <div className="flex items-center gap-1 text-muted-foreground">
-                                                <MapPinOff className={`h-4 w-4 ${entry.paused_at ? 'text-destructive' : ''}`} />
-                                                <span>{formatMinutes(entryPausedMinutes(entry))}</span>
-                                                <Badge variant="outline" className="px-1 text-xs">{(entry.geofence_pauses ?? []).length}</Badge>
-                                                {entry.paused_at && <span className="text-xs text-destructive">teraz poza strefą</span>}
-                                            </div>
-                                        ) : '-'}
+                                        <TooltipProvider><Tooltip>
+                                            <TooltipTrigger asChild><span className="cursor-help">{entryOutsideCount(entry)} ({entryOutsideMinutes(entry)} min)</span></TooltipTrigger>
+                                            <TooltipContent>Wliczone w czas pracy</TooltipContent>
+                                        </Tooltip></TooltipProvider>
+                                        {entryPausedMinutes(entry) > 0 && <p className="text-xs text-muted-foreground">Pauza (stary tryb): {entryPausedMinutes(entry)} min</p>}
                                     </TableCell>
                                     <TableCell className="text-right">
                                         <DropdownMenu>

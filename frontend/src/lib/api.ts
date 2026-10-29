@@ -1,3 +1,4 @@
+import { useCompanyContextStore } from '@/store/company-context.store';
 import axios, { AxiosError } from 'axios';
 import { useAuthStore } from '../store/auth.store';
 import { toast } from 'sonner';
@@ -17,6 +18,13 @@ api.interceptors.request.use(
         const token = useAuthStore.getState().token;
         if (token) {
             config.headers['Authorization'] = `Bearer ${token}`;
+        }
+        const { user } = useAuthStore.getState();
+        const { activeCompany } = useCompanyContextStore.getState();
+        if (user?.role === 'super_admin' && activeCompany) {
+            config.headers['X-Company-Id'] = activeCompany.id;
+        } else {
+            delete config.headers['X-Company-Id'];
         }
         return config;
     },
@@ -90,11 +98,45 @@ api.interceptors.response.use(
     }
 );
 
+export interface SuperAdminCompany {
+    id: string;
+    name: string;
+    created_at?: string;
+    users_count: number;
+    projects_count: number;
+    modules?: string[];
+    subscriptions?: { plan_id: string; status: string; trial_end?: string }[];
+}
+
+export interface SuperAdminPlan {
+    id: string;
+    code: string;
+    name: string;
+    price_monthly: number;
+    price_yearly: number;
+    limits: Record<string, unknown>;
+    is_active: boolean;
+    stripe_product_id?: string | null;
+}
+
+export interface SuperAdminModule {
+    code: string;
+    name: string;
+    description: string;
+    is_active: boolean;
+}
+
+export interface CreateCompanyDto {
+    name: string;
+    planId?: string;
+    admin?: { email: string; password: string; firstName: string; lastName: string };
+}
+
 // --- SUPER ADMIN API ---
 export const superAdminApi = {
     // FIRMY
     getCompanies: async () => {
-        const { data } = await api.get('/super-admin/companies');
+        const { data } = await api.get<SuperAdminCompany[]>('/super-admin/companies');
         return data;
     },
     getStats: async () => {
@@ -102,11 +144,15 @@ export const superAdminApi = {
         return data;
     },
     getCompany: async (id: string) => {
-        const { data } = await api.get(`/super-admin/companies/${id}`);
+        const { data } = await api.get<SuperAdminCompany>(`/super-admin/companies/${id}`);
         return data;
     },
-    createCompany: async (dto: { name: string }) => {
-        const { data } = await api.post('/super-admin/companies', dto);
+    createCompany: async (dto: CreateCompanyDto) => {
+        const { data } = await api.post<{ company: SuperAdminCompany; adminUserId?: string }>('/super-admin/companies', dto);
+        return data;
+    },
+    updateCompany: async (id: string, dto: { name: string }) => {
+        const { data } = await api.patch<SuperAdminCompany>(`/super-admin/companies/${id}`, dto);
         return data;
     },
     // UŻYTKOWNICY
@@ -114,21 +160,21 @@ export const superAdminApi = {
         const { data } = await api.get('/super-admin/users');
         return data;
     },
-    createUser: async (dto: any) => {
+    createUser: async (dto: { email: string; password: string; firstName: string; lastName: string; role: string; companyId?: string }) => {
         const { data } = await api.post('/super-admin/users', dto);
         return data;
     },
 
     // PLANY
     getPlans: async () => {
-        const { data } = await api.get('/super-admin/plans');
+        const { data } = await api.get<SuperAdminPlan[]>('/super-admin/plans');
         return data;
     },
-    createPlan: async (dto: any) => {
+    createPlan: async (dto: Omit<SuperAdminPlan, 'id' | 'stripe_product_id'>) => {
         const { data } = await api.post('/super-admin/plans', dto);
         return data;
     },
-    updatePlan: async (id: string, dto: any) => {
+    updatePlan: async (id: string, dto: Partial<Omit<SuperAdminPlan, 'id' | 'stripe_product_id'>>) => {
         const { data } = await api.put(`/super-admin/plans/${id}`, dto);
         return data;
     },
@@ -139,14 +185,14 @@ export const superAdminApi = {
 
     // MODUŁY
     getModules: async () => {
-        const { data } = await api.get('/super-admin/modules');
+        const { data } = await api.get<SuperAdminModule[]>('/super-admin/modules');
         return data;
     },
-    createModule: async (dto: any) => {
+    createModule: async (dto: SuperAdminModule) => {
         const { data } = await api.post('/super-admin/modules', dto);
         return data;
     },
-    updateModule: async (code: string, dto: any) => {
+    updateModule: async (code: string, dto: Partial<SuperAdminModule>) => {
         const { data } = await api.put(`/super-admin/modules/${code}`, dto);
         return data;
     },

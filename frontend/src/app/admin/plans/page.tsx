@@ -22,17 +22,17 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { superAdminApi, getApiErrorMessage } from '@/lib/api';
+import { superAdminApi, getApiErrorMessage, SuperAdminPlan, SuperAdminModule } from '@/lib/api';
 import { toast } from 'sonner';
 import { Plus, Trash2, Edit2, Archive } from 'lucide-react';
 
 export default function PlansPage() {
-    const [plans, setPlans] = useState<any[]>([]);
-    const [modules, setModules] = useState<any[]>([]);
+    const [plans, setPlans] = useState<SuperAdminPlan[]>([]);
+    const [modules, setModules] = useState<SuperAdminModule[]>([]);
     const [loading, setLoading] = useState(true);
 
     const [isPlanModalOpen, setIsPlanModalOpen] = useState(false);
-    const [editingPlan, setEditingPlan] = useState<any | null>(null);
+    const [editingPlan, setEditingPlan] = useState<SuperAdminPlan | null>(null);
     const [planData, setPlanData] = useState({
         code: '',
         name: '',
@@ -44,7 +44,7 @@ export default function PlansPage() {
     const [planModules, setPlanModules] = useState<string[]>([]); // Selected modules for plan
 
     const [isModuleModalOpen, setIsModuleModalOpen] = useState(false);
-    const [editingModule, setEditingModule] = useState<any | null>(null);
+    const [editingModule, setEditingModule] = useState<SuperAdminModule | null>(null);
     const [moduleData, setModuleData] = useState({
         code: '',
         name: '',
@@ -88,7 +88,7 @@ export default function PlansPage() {
         setIsPlanModalOpen(true);
     };
 
-    const handleEditPlan = async (plan: any) => {
+    const handleEditPlan = async (plan: SuperAdminPlan) => {
         setEditingPlan(plan);
         setPlanData({
             code: plan.code,
@@ -151,7 +151,7 @@ export default function PlansPage() {
         setIsModuleModalOpen(true);
     };
 
-    const handleEditModule = (module: any) => {
+    const handleEditModule = (module: SuperAdminModule) => {
         setEditingModule(module);
         setModuleData({
             code: module.code,
@@ -180,7 +180,7 @@ export default function PlansPage() {
     };
 
     const handleDeleteModule = async (code: string) => {
-        if (!confirm('Czy na pewno chcesz usunąć ten moduł? Może to wpłynąć na działanie firm.')) return;
+        if (!confirm('Czy na pewno chcesz usunąć ten moduł? Może to wpłynąć na działanie podmiotów.')) return;
         try {
             await superAdminApi.deleteModule(code);
             toast.success('Moduł usunięty');

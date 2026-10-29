@@ -1,3 +1,4 @@
+import { useCompanyContextStore } from './company-context.store';
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { Capacitor } from '@capacitor/core';
@@ -52,12 +53,15 @@ export const useAuthStore = create<AuthState>()(
                 user: userProfile,
                 isAuthenticated: true
             }),
-            logout: () => set({
-                token: null,
-                refreshToken: null,
-                user: null,
-                isAuthenticated: false
-            }),
+            logout: () => {
+                useCompanyContextStore.getState().exitCompany();
+                set({
+                    token: null,
+                    refreshToken: null,
+                    user: null,
+                    isAuthenticated: false
+                });
+            },
             // ✅ Nowa metoda do odświeżania profilu
             refreshSession: async () => {
                 const token = get().token;

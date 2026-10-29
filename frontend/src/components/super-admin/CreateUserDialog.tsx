@@ -8,7 +8,6 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { AxiosError } from 'axios'; // ✅ 1. Importujemy typ błędu
 
 interface Company {
     id: string;
@@ -38,7 +37,7 @@ export function CreateUserDialog({ open, onOpenChange, onSuccess }: CreateUserDi
         if (open) {
             api.get('/super-admin/companies')
                 .then((res) => setCompanies(res.data))
-                .catch((error: unknown) => toast.error('Nie udało się pobrać listy firm', { description: getApiErrorMessage(error, 'Sprawdź połączenie i spróbuj ponownie.') }));
+                .catch((error: unknown) => toast.error('Nie udało się pobrać listy podmiotów', { description: getApiErrorMessage(error, 'Sprawdź połączenie i spróbuj ponownie.') }));
         }
     }, [open]);
 
@@ -53,11 +52,7 @@ export function CreateUserDialog({ open, onOpenChange, onSuccess }: CreateUserDi
             onOpenChange(false);
             setFormData({ email: '', password: '', firstName: '', lastName: '', role: 'employee', companyId: '' });
         } catch (error) {
-            // ✅ 2. Bezpieczna obsługa błędu bez 'any'
-            const err = error as AxiosError<{ message: string }>;
-            console.error(err);
-            const message = err.response?.data?.message || 'Błąd tworzenia użytkownika';
-            toast.error(message);
+            toast.error(getApiErrorMessage(error, 'Nie udało się utworzyć użytkownika.'));
         } finally {
             setLoading(false);
         }
@@ -122,21 +117,21 @@ export function CreateUserDialog({ open, onOpenChange, onSuccess }: CreateUserDi
                                 <SelectContent>
                                     <SelectItem value="employee">Pracownik</SelectItem>
                                     <SelectItem value="manager">Manager</SelectItem>
-                                    <SelectItem value="admin">Admin Firmy</SelectItem>
+                                    <SelectItem value="admin">Admin podmiotu</SelectItem>
                                     <SelectItem value="super_admin">Super Admin</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
 
                         <div className="space-y-2">
-                            <Label>Firma</Label>
+                            <Label>Podmiot</Label>
                             <Select
                                 value={formData.companyId}
                                 onValueChange={(val) => setFormData({...formData, companyId: val})}
                                 disabled={formData.role === 'super_admin'}
                             >
                                 <SelectTrigger>
-                                    <SelectValue placeholder="Wybierz firmę" />
+                                    <SelectValue placeholder="Wybierz podmiot" />
                                 </SelectTrigger>
                                 <SelectContent>
                                     {companies.map((c) => (

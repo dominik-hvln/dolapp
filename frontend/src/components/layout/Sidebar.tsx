@@ -1,3 +1,4 @@
+import { useCompanyContextStore } from '@/store/company-context.store';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -47,12 +48,14 @@ export default function Sidebar({ isMobile = false }: SidebarProps) {
     const pathname = usePathname();
     const { user } = useAuthStore();
 
+    const activeCompany = useCompanyContextStore((state) => state.activeCompany);
+
     // ✅ Filtrujemy linki
     const visibleLinks = navLinks.filter(link => {
         if (!user) return false;
 
         // 1. Sprawdź rolę
-        if (link.roles && !link.roles.includes(user.role)) return false;
+        if (link.roles && !link.roles.includes(user.role) && !(user.role === 'super_admin' && activeCompany && link.roles.includes('admin'))) return false;
 
         // 2. Sprawdź moduł (Dla super_admin pomijamy sprawdzanie modułów, ma wszystko)
         if (user.role !== 'super_admin' && link.moduleCode) {

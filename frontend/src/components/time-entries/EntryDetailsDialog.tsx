@@ -11,6 +11,8 @@ import {
     AuditLog,
     entryDurationMinutes,
     entryPausedMinutes,
+    entryOutsideMinutes,
+    entryOutsideCount,
     formatMinutes,
     resumeSourceLabel,
 } from '@/lib/time-entries';
@@ -66,12 +68,14 @@ export function EntryDetailsDialog({ entry, onClose }: EntryDetailsDialogProps) 
                 <div className="space-y-6 max-h-[70vh] overflow-y-auto pr-1">
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                         <SummaryTile label="Czas pracy" value={formatMinutes(workMinutes)} />
-                        <SummaryTile label="Poza strefą" value={formatMinutes(pausedMinutes)} />
-                        <SummaryTile label="Przerwy" value={String(pauses.length)} />
-                        <SummaryTile label="Status" value={isOngoing ? (entry.paused_at ? 'Wstrzymany' : 'W trakcie') : 'Zakończony'} />
+                        <SummaryTile label="Poza strefą (wliczone w czas pracy)" value={formatMinutes(entryOutsideMinutes(entry))} />
+                        <SummaryTile label="Wyjścia poza strefę" value={String(entryOutsideCount(entry))} />
+                        <SummaryTile label="Status" value={isOngoing ? (entry.paused_at && !pauses.some((pause) => pause.is_work_time === true && !pause.resumed_at) ? 'Wstrzymany' : 'W trakcie') : 'Zakończony'} />
                     </div>
 
+                    {pausedMinutes > 0 && <p className="text-sm text-muted-foreground">Pauza (stary tryb): {pausedMinutes} min</p>}
                     <div className="flex flex-wrap gap-2">
+                        {entry.is_overtime && <Badge variant="secondary">Nadgodziny</Badge>}
                         {entry.switched_by === 'auto_limit' && <Badge variant="secondary">auto: nadgodziny</Badge>}
                         {entry.was_edited && <Badge variant="outline">Edytowany</Badge>}
                         {entry.is_outside_geofence && <Badge variant="destructive">Rozpoczęty poza strefą</Badge>}
@@ -86,16 +90,16 @@ export function EntryDetailsDialog({ entry, onClose }: EntryDetailsDialogProps) 
                                     <TimelineItem
                                         nested
                                         icon={<LogOut className="h-3 w-3" />}
-                                        title={`Wyjście ze strefy ${fmtTime(pause.paused_at)}`}
+                                        title={`${pause.is_work_time === true ? 'Wyjście ze strefy' : 'Pauza (stary tryb)'} ${fmtTime(pause.paused_at)}`}
                                         time={fmtDateTime(pause.paused_at)}
                                     />
                                     <TimelineItem
                                         nested
                                         icon={<LogIn className="h-3 w-3" />}
                                         title={pause.resumed_at
-                                            ? `Powrót do strefy ${fmtTime(pause.resumed_at)} (${resumeSourceLabel(pause.resume_source)})`
+                                            ? `${pause.resume_source === 'stop' || pause.resume_source === 'auto_limit' ? 'Koniec interwału' : 'Powrót do strefy'} ${fmtTime(pause.resumed_at)} (${resumeSourceLabel(pause.resume_source)})`
                                             : entry.end_time
-                                                ? `Powrót niezarejestrowany - przerwa do końca wpisu ${fmtTime(entry.end_time)}`
+                                                ? `Powrót niezarejestrowany - interwał do końca wpisu ${fmtTime(entry.end_time)}`
                                                 : 'Powrót do strefy - oczekuje'}
                                         time={pause.resumed_at ? fmtDateTime(pause.resumed_at) : entry.end_time ? fmtDateTime(entry.end_time) : 'brak'}
                                     />

@@ -1,113 +1,96 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { superAdminApi, getApiErrorMessage } from '@/lib/api';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { superAdminApi, getApiErrorMessage, SuperAdminCompany } from '@/lib/api';
+import { useCompanyContextStore } from '@/store/company-context.store';
+import { CreateCompanyDialog } from '@/components/super-admin/CreateCompanyDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { pl } from 'date-fns/locale';
 
 export default function CompaniesPage() {
-    const [companies, setCompanies] = useState<any[]>([]);
+    const [companies, setCompanies] = useState<SuperAdminCompany[]>([]);
     const [loading, setLoading] = useState(true);
-    const [newCompany, setNewCompany] = useState({ name: '' });
-    const [isDialogOpen, setIsDialogOpen] = useState(false);
-
-    useEffect(() => {
-        fetchCompanies();
-    }, []);
+    const [isCreateOpen, setIsCreateOpen] = useState(false);
+    const [renaming, setRenaming] = useState<SuperAdminCompany | null>(null);
+    const [name, setName] = useState('');
+    const [saving, setSaving] = useState(false);
+    const { enterCompany } = useCompanyContextStore();
+    const router = useRouter();
 
     const fetchCompanies = async () => {
         setLoading(true);
         try {
-            const data = await superAdminApi.getCompanies();
-            setCompanies(data);
+            setCompanies(await superAdminApi.getCompanies());
         } catch (error) {
-            console.error(error);
-            toast.error('Błąd pobierania firm', { description: getApiErrorMessage(error, 'Sprawdź połączenie i spróbuj ponownie.') });
+            toast.error(getApiErrorMessage(error, 'Nie udało się pobrać podmiotów.'));
         } finally {
             setLoading(false);
         }
     };
 
-    const handleCreateCompany = async () => {
+    useEffect(() => { fetchCompanies(); }, []);
+
+    const rename = async (event: React.FormEvent) => {
+        event.preventDefault();
+        if (!renaming || !name.trim()) return;
+        setSaving(true);
         try {
-            await superAdminApi.createCompany(newCompany);
-            toast.success('Firma utworzona');
-            setIsDialogOpen(false);
-            setNewCompany({ name: '' });
-            fetchCompanies();
+            const updated = await superAdminApi.updateCompany(renaming.id, { name: name.trim() });
+            const context = useCompanyContextStore.getState();
+            if (context.activeCompany?.id === updated.id) context.enterCompany({ id: updated.id, name: updated.name });
+            toast.success('Nazwa podmiotu została zmieniona');
+            setRenaming(null);
+            await fetchCompanies();
         } catch (error) {
-            toast.error('Błąd tworzenia firmy', { description: getApiErrorMessage(error, 'Sprawdź połączenie i spróbuj ponownie.') });
+            toast.error(getApiErrorMessage(error, 'Nie udało się zmienić nazwy podmiotu.'));
+        } finally {
+            setSaving(false);
         }
     };
-
-    if (loading) return <div>Ładowanie...</div>;
 
     return (
         <div className="space-y-6">
             <div className="flex items-center justify-between">
-                <h1 className="text-2xl font-bold">Wszystkie Firmy</h1>
-                <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                    <DialogTrigger asChild>
-                        <Button>Dodaj Nową Firmę</Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                        <DialogHeader>
-                            <DialogTitle>Dodaj nową firmę</DialogTitle>
-                        </DialogHeader>
-                        <div className="space-y-4 py-4">
-                            <Input
-                                placeholder="Nazwa firmy"
-                                value={newCompany.name}
-                                onChange={(e) => setNewCompany({ name: e.target.value })}
-                            />
-                            <Button onClick={handleCreateCompany} className="w-full">
-                                Utwórz
-                            </Button>
-                        </div>
-                    </DialogContent>
-                </Dialog>
+                <h1 className="text-2xl font-bold">Podmioty</h1>
+                <Button onClick={() => setIsCreateOpen(true)}>Dodaj podmiot</Button>
             </div>
-
-            <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
+            <CreateCompanyDialog open={isCreateOpen} onOpenChange={setIsCreateOpen} onSuccess={fetchCompanies} />
+            <div className="bg-white rounded-lg border overflow-hidden">
                 <Table>
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead>Nazwa Firmy</TableHead>
-                            <TableHead>ID</TableHead>
-                            <TableHead>Data utworzenia</TableHead>
-                            <TableHead className="text-right">Akcje</TableHead>
-                        </TableRow>
-                    </TableHeader>
+                    <TableHeader><TableRow><TableHead>Nazwa podmiotu</TableHead><TableHead>Pracownicy</TableHead><TableHead>Projekty</TableHead><TableHead>Data utworzenia</TableHead><TableHead className="text-right">Akcje</TableHead></TableRow></TableHeader>
                     <TableBody>
-                        {companies.map((company) => (
+                        {loading ? <TableRow><TableCell colSpan={5}>Ładowanie...</TableCell></TableRow> : companies.map((company) => (
                             <TableRow key={company.id}>
-                                <TableCell className="font-medium text-indigo-900">{company.name}</TableCell>
-                                <TableCell className="font-mono text-xs text-gray-500">{company.id}</TableCell>
-                                <TableCell>
-                                    {company.created_at && format(new Date(company.created_at), 'd MMM yyyy', { locale: pl })}
-                                </TableCell>
-                                <TableCell className="text-right">
-                                    <a href={`/admin/companies/${company.id}`}>
-                                        <Button variant="outline" size="sm">Szczegóły</Button>
-                                    </a>
+                                <TableCell className="font-medium">{company.name}</TableCell>
+                                <TableCell>{company.users_count}</TableCell><TableCell>{company.projects_count}</TableCell>
+                                <TableCell>{company.created_at ? format(new Date(company.created_at), 'd MMM yyyy', { locale: pl }) : '-'}</TableCell>
+                                <TableCell className="text-right space-x-2">
+                                    <Button size="sm" onClick={() => { enterCompany({ id: company.id, name: company.name }); router.push('/dashboard'); }}>Zarządzaj</Button>
+                                    <Button size="sm" variant="outline" onClick={() => { setRenaming(company); setName(company.name); }}>Zmień nazwę</Button>
+                                    <Button asChild size="sm" variant="outline"><Link href={`/admin/companies/${company.id}`}>Szczegóły</Link></Button>
                                 </TableCell>
                             </TableRow>
                         ))}
-                        {companies.length === 0 && (
-                            <TableRow>
-                                <TableCell colSpan={4} className="text-center py-8 text-gray-500">
-                                    Brak firm w systemie.
-                                </TableCell>
-                            </TableRow>
-                        )}
+                        {!loading && companies.length === 0 && <TableRow><TableCell colSpan={5} className="text-center py-8">Brak podmiotów w systemie.</TableCell></TableRow>}
                     </TableBody>
                 </Table>
             </div>
-        </div >
+            <Dialog open={!!renaming} onOpenChange={(open) => { if (!open && !saving) setRenaming(null); }}>
+                <DialogContent><DialogHeader><DialogTitle>Zmień nazwę podmiotu</DialogTitle></DialogHeader>
+                    <form onSubmit={rename} className="space-y-4">
+                        <Label htmlFor="company-name">Nazwa podmiotu</Label><Input id="company-name" value={name} onChange={(event) => setName(event.target.value)} required />
+                        <Button type="submit" disabled={saving || !name.trim()}>{saving ? 'Zapisywanie...' : 'Zapisz'}</Button>
+                    </form>
+                </DialogContent>
+            </Dialog>
+        </div>
     );
 }

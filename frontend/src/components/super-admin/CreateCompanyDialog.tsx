@@ -1,78 +1,105 @@
 'use client';
 
-import { useState } from 'react';
-import { api, getApiErrorMessage } from '@/lib/api';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { useEffect, useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { superAdminApi, getApiErrorMessage } from '@/lib/api';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
+
+const schema = z.object({
+    name: z.string().trim().min(1, 'Podaj nazwę podmiotu.'),
+    planId: z.string(),
+    createAdmin: z.boolean(),
+    firstName: z.string(),
+    lastName: z.string(),
+    email: z.string(),
+    password: z.string(),
+}).superRefine((values, ctx) => {
+    if (!values.createAdmin) return;
+    for (const key of ['firstName', 'lastName'] as const) {
+        if (!values[key].trim()) ctx.addIssue({ code: 'custom', path: [key], message: 'To pole jest wymagane.' });
+    }
+    if (!z.email().safeParse(values.email.trim()).success) ctx.addIssue({ code: 'custom', path: ['email'], message: 'Podaj poprawny adres e-mail.' });
+    if (values.password.length < 8) ctx.addIssue({ code: 'custom', path: ['password'], message: 'Hasło musi mieć co najmniej 8 znaków.' });
+});
 
 interface CreateCompanyDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    onSuccess: () => void; // Callback do odświeżenia listy po sukcesie
+    onSuccess: () => void;
 }
 
 export function CreateCompanyDialog({ open, onOpenChange, onSuccess }: CreateCompanyDialogProps) {
-    const [name, setName] = useState('');
-    const [loading, setLoading] = useState(false);
+    const [plans, setPlans] = useState<{ id: string; name: string }[]>([]);
+    const form = useForm<z.infer<typeof schema>>({
+        resolver: zodResolver(schema),
+        defaultValues: { name: '', planId: 'none', createAdmin: false, firstName: '', lastName: '', email: '', password: '' },
+    });
+    const createAdmin = form.watch('createAdmin');
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!name.trim()) return;
+    useEffect(() => {
+        if (!open) return;
+        let cancelled = false;
+        superAdminApi.getPlans()
+            .then((data) => { if (!cancelled) setPlans(data); })
+            .catch((error: unknown) => toast.error(getApiErrorMessage(error, 'Nie udało się pobrać planów.')));
+        return () => { cancelled = true; };
+    }, [open]);
 
-        setLoading(true);
+    const submit = async (values: z.infer<typeof schema>) => {
         try {
-            await api.post('/super-admin/companies', { name });
-            toast.success('Firma została utworzona');
-            setName(''); // Reset formularza
-            onSuccess(); // Odśwież dane rodzica
-            onOpenChange(false); // Zamknij modal
+            await superAdminApi.createCompany({
+                name: values.name,
+                ...(values.planId !== 'none' ? { planId: values.planId } : {}),
+                ...(values.createAdmin ? { admin: { firstName: values.firstName.trim(), lastName: values.lastName.trim(), email: values.email.trim(), password: values.password } } : {}),
+            });
+            toast.success('Podmiot został utworzony');
+            form.reset();
+            onSuccess();
+            onOpenChange(false);
         } catch (error) {
-            console.error(error);
-            toast.error('Nie udało się utworzyć firmy', { description: getApiErrorMessage(error, 'Sprawdź połączenie i spróbuj ponownie.') });
-        } finally {
-            setLoading(false);
+            toast.error(getApiErrorMessage(error, 'Nie udało się utworzyć podmiotu.'));
         }
     };
 
     return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-[425px]">
-                <form onSubmit={handleSubmit}>
-                    <DialogHeader>
-                        <DialogTitle>Dodaj nową firmę</DialogTitle>
-                        <DialogDescription>
-                            Utwórz nową organizację w systemie. Później będziesz mógł przypisać do niej użytkowników.
-                        </DialogDescription>
-                    </DialogHeader>
-
-                    <div className="grid gap-4 py-4">
-                        <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="name" className="text-right">
-                                Nazwa
-                            </Label>
-                            <Input
-                                id="name"
-                                value={name}
-                                onChange={(e) => setName(e.target.value)}
-                                className="col-span-3"
-                                placeholder="Np. Acme Corp"
-                                autoFocus
-                            />
-                        </div>
-                    </div>
-
-                    <DialogFooter>
-                        <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-                            Anuluj
-                        </Button>
-                        <Button type="submit" disabled={loading}>
-                            {loading ? 'Tworzenie...' : 'Utwórz firmę'}
-                        </Button>
-                    </DialogFooter>
-                </form>
+        <Dialog open={open} onOpenChange={(value) => { if (!form.formState.isSubmitting) onOpenChange(value); }}>
+            <DialogContent className="max-h-[90vh] overflow-y-auto">
+                <DialogHeader><DialogTitle>Dodaj podmiot</DialogTitle></DialogHeader>
+                <Form {...form}>
+                    <form onSubmit={form.handleSubmit(submit)} className="space-y-4">
+                        <FormField control={form.control} name="name" render={({ field }) => (
+                            <FormItem><FormLabel>Nazwa podmiotu</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                        )} />
+                        <FormField control={form.control} name="planId" render={({ field }) => (
+                            <FormItem><FormLabel>Plan (opcjonalnie)</FormLabel>
+                                <Select value={field.value} onValueChange={field.onChange}>
+                                    <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                                    <SelectContent><SelectItem value="none">Bez planu</SelectItem>{plans.map((plan) => <SelectItem key={plan.id} value={plan.id}>{plan.name}</SelectItem>)}</SelectContent>
+                                </Select><FormMessage />
+                            </FormItem>
+                        )} />
+                        <FormField control={form.control} name="createAdmin" render={({ field }) => (
+                            <FormItem className="flex items-center gap-2"><FormControl><Checkbox checked={field.value} onCheckedChange={(value) => field.onChange(value === true)} /></FormControl><FormLabel>Utwórz administratora podmiotu</FormLabel></FormItem>
+                        )} />
+                        {createAdmin && (['firstName', 'lastName', 'email', 'password'] as const).map((name) => (
+                            <FormField key={name} control={form.control} name={name} render={({ field }) => (
+                                <FormItem><FormLabel>{{ firstName: 'Imię', lastName: 'Nazwisko', email: 'E-mail', password: 'Hasło' }[name]}</FormLabel><FormControl><Input {...field} type={name === 'password' ? 'password' : name === 'email' ? 'email' : 'text'} autoComplete={name === 'password' ? 'new-password' : undefined} /></FormControl><FormMessage /></FormItem>
+                            )} />
+                        ))}
+                        <DialogFooter>
+                            <Button type="button" variant="outline" disabled={form.formState.isSubmitting} onClick={() => onOpenChange(false)}>Anuluj</Button>
+                            <Button type="submit" disabled={form.formState.isSubmitting}>{form.formState.isSubmitting ? 'Tworzenie...' : 'Utwórz podmiot'}</Button>
+                        </DialogFooter>
+                    </form>
+                </Form>
             </DialogContent>
         </Dialog>
     );

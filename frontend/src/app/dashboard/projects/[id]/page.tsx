@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useRef, useMemo } from 'react';
+import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { useParams } from 'next/navigation';
 import { api, getApiErrorMessage } from '@/lib/api';
@@ -23,6 +24,9 @@ interface Project {
     geo_latitude: number | null;
     geo_longitude: number | null;
     geo_radius_meters: number | null;
+    is_overtime: boolean;
+    parent_project_id: string | null;
+    overtime_project: { id: string; name: string; task_id: string } | null;
 }
 interface Task { id: string; name: string; description: string; }
 interface User { id: string; first_name: string; last_name: string; email: string; }
@@ -33,6 +37,7 @@ export default function ProjectDetailsPage() {
     const qrCodeRef = useRef<HTMLDivElement>(null);
 
     const [project, setProject] = useState<Project | null>(null);
+    const [overtimeTasks, setOvertimeTasks] = useState<Task[]>([]);
     const [tasks, setTasks] = useState<Task[]>([]);
     const [companyUsers, setCompanyUsers] = useState<User[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -58,10 +63,17 @@ export default function ProjectDetailsPage() {
         setIsLoading(true);
         try {
             const [projectRes, tasksRes, usersRes] = await Promise.all([
-                api.get(`/projects/${projectId}`),
-                api.get(`/tasks/in-project/${projectId}`),
+                api.get<Project>(`/projects/${projectId}`),
+                api.get<Task[]>(`/tasks/in-project/${projectId}`),
                 api.get('/users'), // Pobieramy listę wszystkich użytkowników w firmie
             ]);
+            const overtime = projectRes.data.overtime_project;
+            if (!projectRes.data.is_overtime && overtime) {
+                const { data } = await api.get<Task[]>(`/tasks/in-project/${overtime.id}`);
+                setOvertimeTasks(data);
+            } else {
+                setOvertimeTasks([]);
+            }
             setProject(projectRes.data);
             setTasks(tasksRes.data);
             setCompanyUsers(usersRes.data);
@@ -147,10 +159,10 @@ export default function ProjectDetailsPage() {
         }
     };
 
-    const handleGenerateQr = async (taskId: string) => {
+    const handleGenerateQr = async (taskId: string, taskProjectId: string = projectId) => {
         try {
             // ✅ POPRAWIONY ADRES URL
-            const response = await api.post(`/tasks/in-project/${projectId}/${taskId}/qr-code`);
+            const response = await api.post(`/tasks/in-project/${taskProjectId}/${taskId}/qr-code`);
             setSelectedTaskQr(response.data.code_value);
         } catch (error) {
             toast.error('Błąd', { description: getApiErrorMessage(error, 'Nie udało się wygenerować kodu QR.') });
@@ -181,13 +193,33 @@ export default function ProjectDetailsPage() {
     if (isLoading) return <div className="p-4">Ładowanie...</div>;
     if (!project) return <div className="p-4">Nie znaleziono projektu.</div>;
 
+    const overtimeProject = project.overtime_project;
+
     return (
         <div>
             <h1 className="text-3xl font-bold">{project.name}</h1>
             <p className="text-muted-foreground">{project.description}</p>
             <p className="text-sm text-muted-foreground mt-1">Adres: {project.address || 'Brak'}</p>
 
-            <div className="mt-8">
+            {project.is_overtime && (
+                <div role="status" className="mt-4 rounded-lg border bg-blue-50 p-4">
+                    <p>To projekt nadgodzin zarządzany automatycznie razem z projektem głównym.</p>
+                    {project.parent_project_id && <Link className="underline" href={`/dashboard/projects/${project.parent_project_id}`}>Przejdź do projektu głównego</Link>}
+                </div>
+            )}
+            {!project.is_overtime && overtimeProject && (
+                <section className="mt-6 space-y-3 rounded-lg border p-4">
+                    <h2 className="text-xl font-semibold">Projekt nadgodzin</h2>
+                    <Link className="underline" href={`/dashboard/projects/${overtimeProject.id}`}>{overtimeProject.name}</Link>
+                    {overtimeTasks.filter((task) => task.id === overtimeProject.task_id).map((task) => (
+                        <div key={task.id} className="flex flex-wrap items-center gap-3">
+                            <span>Zlecenie: {task.name}</span>
+                            <Button variant="outline" size="sm" onClick={() => handleGenerateQr(task.id, overtimeProject.id)}>Generuj QR</Button>
+                        </div>
+                    ))}
+                </section>
+            )}
+            {!project.is_overtime && <div className="mt-8">
                 <h2 className="text-2xl font-bold mb-4">Strefa Geofence</h2>
                 <div className="grid gap-6">
                     <div className="flex gap-2">
@@ -228,18 +260,18 @@ export default function ProjectDetailsPage() {
                         <Button onClick={handleSaveGeofence} className="self-end">Zapisz strefę</Button>
                     </div>
                 </div>
-            </div>
+            </div>}
 
             <div className="mt-8">
                 <div className="flex justify-between items-center mb-4">
                     <h2 className="text-2xl font-bold">Zlecenia (Taski)</h2>
-                    <Dialog open={isTaskDialogOpen} onOpenChange={setIsTaskDialogOpen}>
+                    {!project.is_overtime && <Dialog open={isTaskDialogOpen} onOpenChange={setIsTaskDialogOpen}>
                         <DialogTrigger asChild><Button>Dodaj Zlecenie</Button></DialogTrigger>
                         <DialogContent>
                             <DialogHeader><DialogTitle>Nowe zlecenie dla: {project.name}</DialogTitle></DialogHeader>
                             <CreateTaskForm projectId={projectId} onSuccess={handleTaskCreated} />
                         </DialogContent>
-                    </Dialog>
+                    </Dialog>}
                 </div>
                 <div className="border rounded-lg">
                     <Table>
@@ -257,7 +289,7 @@ export default function ProjectDetailsPage() {
                                         <TableCell>{task.name}</TableCell>
                                         <TableCell>{task.description}</TableCell>
                                         <TableCell className="text-right space-x-2">
-                                            <Button variant="outline" size="sm" onClick={() => setTaskToAssign(task)}>Zarządzaj</Button>
+                                            {!project.is_overtime && <Button variant="outline" size="sm" onClick={() => setTaskToAssign(task)}>Zarządzaj</Button>}
                                             <Button variant="outline" size="sm" onClick={() => handleGenerateQr(task.id)}>Generuj QR</Button>
                                         </TableCell>
                                     </TableRow>

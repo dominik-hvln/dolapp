@@ -1,12 +1,14 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { api } from '@/lib/api';
+import { api, getApiErrorMessage } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { CreateUserForm } from '@/components/users/CreateUserForm';
 import { EditUserForm, EditableUser } from '@/components/users/EditUserForm';
+import { EmployeeDocumentsDialog } from '@/components/users/EmployeeDocumentsDialog';
+import { toast } from 'sonner';
 import { Pencil } from 'lucide-react';
 import { CompanyOvertimeSettingsCard } from '@/components/users/CompanyOvertimeSettingsCard';
 import type { TaskOption } from '@/lib/users';
@@ -31,6 +33,7 @@ export default function UsersPage() {
     const [users, setUsers] = useState<User[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
+    const [documentsUser, setDocumentsUser] = useState<User | null>(null);
     const [editedUser, setEditedUser] = useState<User | null>(null);
     const [tasks, setTasks] = useState<TaskOption[]>([]);
 
@@ -40,7 +43,7 @@ export default function UsersPage() {
             const response = await api.get('/users');
             setUsers(response.data);
         } catch (error) {
-            console.error('Błąd podczas pobierania użytkowników:', error);
+            toast.error(getApiErrorMessage(error, 'Nie udało się pobrać użytkowników.'));
         } finally {
             setIsLoading(false);
         }
@@ -51,14 +54,14 @@ export default function UsersPage() {
             await api.patch(endpoint);
             fetchUsers();
         } catch (error) {
-            console.error('Błąd zmiany statusu:', error);
+            toast.error(getApiErrorMessage(error, 'Nie udało się zmienić statusu.'));
         }
     };
     useEffect(() => {
         fetchUsers();
         api.get<TaskOption[]>('/tasks')
             .then(({ data }) => setTasks(Array.isArray(data) ? data : []))
-            .catch((error) => console.error('Błąd podczas pobierania zadań:', error));
+            .catch((error: unknown) => toast.error(getApiErrorMessage(error, 'Nie udało się pobrać zleceń.')));
     }, []);
     const handleUserCreated = () => { setIsDialogOpen(false); fetchUsers(); };
     const handleUserUpdated = () => { setEditedUser(null); fetchUsers(); };
@@ -107,7 +110,8 @@ export default function UsersPage() {
                                         {user.is_active ? 'Aktywny' : 'Nieaktywny'}
                                     </Button>
                                 </TableCell>
-                                <TableCell>
+                                <TableCell className="space-x-2">
+                                    <Button variant="outline" size="sm" onClick={() => setDocumentsUser(user)}>Teczka</Button>
                                     <Button variant="outline" size="sm" onClick={() => setEditedUser(user)}>
                                         <Pencil className="h-4 w-4 mr-1" /> Edytuj
                                     </Button>
@@ -118,6 +122,7 @@ export default function UsersPage() {
                 </Table>
             </div>
 
+            {documentsUser && <EmployeeDocumentsDialog key={documentsUser.id} user={documentsUser} onClose={() => setDocumentsUser(null)} />}
             <Dialog open={!!editedUser} onOpenChange={(open) => { if (!open) setEditedUser(null); }}>
                 <DialogContent>
                     <DialogHeader><DialogTitle>Edytuj pracownika</DialogTitle></DialogHeader>

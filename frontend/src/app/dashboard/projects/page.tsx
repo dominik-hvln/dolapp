@@ -30,6 +30,7 @@ interface Project {
     name: string;
     description: string;
     created_at: string;
+    overtime_project: { id: string; name: string; task_id: string } | null;
 }
 
 export default function ProjectsPage() {
@@ -53,6 +54,7 @@ export default function ProjectsPage() {
         } catch (error) {
             console.error('Błąd podczas pobierania projektów:', error);
             setProjects([]);
+            toast.error(getApiErrorMessage(error, 'Nie udało się pobrać projektów.'));
         } finally {
             setIsLoading(false);
         }
@@ -141,6 +143,7 @@ export default function ProjectsPage() {
                                             <Link href={`/dashboard/projects/${project.id}`} className="hover:underline">
                                                 {project.name}
                                             </Link>
+                                            {project.overtime_project && <p className="text-sm font-normal text-muted-foreground">Projekt nadgodzin: {project.overtime_project.name}</p>}
                                         </TableCell>
                                         <TableCell>{project.description || '-'}</TableCell>
                                         <TableCell>

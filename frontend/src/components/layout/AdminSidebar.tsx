@@ -20,7 +20,7 @@ export default function AdminSidebar() {
 
     const navItems = [
         { label: 'Dashboard', path: '/admin', icon: LayoutDashboard },
-        { label: 'Firmy', path: '/admin/companies', icon: Building2 },
+        { label: 'Podmioty', path: '/admin/companies', icon: Building2 },
         { label: 'Plany i Moduły', path: '/admin/plans', icon: Layers },
         // { label: 'Użytkownicy', path: '/admin/users', icon: Users },
     ];

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { superAdminApi, getApiErrorMessage } from '@/lib/api';
+import { superAdminApi, getApiErrorMessage, SuperAdminCompany, SuperAdminPlan, SuperAdminModule } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { Check, X, Shield, Calendar, Settings } from 'lucide-react';
@@ -13,9 +13,9 @@ export default function CompanyDetailsPage() {
     const params = useParams();
     const id = params.id as string;
 
-    const [company, setCompany] = useState<any>(null);
-    const [plans, setPlans] = useState<any[]>([]);
-    const [allModules, setAllModules] = useState<any[]>([]);
+    const [company, setCompany] = useState<SuperAdminCompany | null>(null);
+    const [plans, setPlans] = useState<SuperAdminPlan[]>([]);
+    const [allModules, setAllModules] = useState<SuperAdminModule[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -34,7 +34,7 @@ export default function CompanyDetailsPage() {
             setAllModules(modsData);
         } catch (error) {
             console.error(error);
-            toast.error('Błąd pobierania danych firmy', { description: getApiErrorMessage(error, 'Sprawdź połączenie i spróbuj ponownie.') });
+            toast.error('Błąd pobierania danych podmiotu', { description: getApiErrorMessage(error, 'Sprawdź połączenie i spróbuj ponownie.') });
         } finally {
             setLoading(false);
         }
@@ -60,8 +60,8 @@ export default function CompanyDetailsPage() {
         }
     };
 
-    if (loading) return <div>Ładowanie danych firmy...</div>;
-    if (!company) return <div>Nie znaleziono firmy.</div>;
+    if (loading) return <div>Ładowanie danych podmiotu...</div>;
+    if (!company) return <div>Nie znaleziono podmiotu.</div>;
 
     const currentSubscription = company.subscriptions?.[0]; // Assuming one active sub for now
     const activeModuleCodes = company.modules || [];
@@ -137,7 +137,7 @@ export default function CompanyDetailsPage() {
 
                     <div className="space-y-4">
                         <p className="text-sm text-gray-500">
-                            Możesz ręcznie włączyć/wyłączyć moduły dla tej firmy, niezależnie od wybranego planu (tzw. override).
+                            Możesz ręcznie włączyć/wyłączyć moduły dla tego podmiotu, niezależnie od wybranego planu (tzw. override).
                         </p>
 
                         <div className="divide-y">
