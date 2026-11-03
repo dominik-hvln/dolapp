@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Building2, Layers, Users, LogOut } from 'lucide-react';
+import { Building2, LogOut } from 'lucide-react';
 import { useAuthStore } from '@/store/auth.store';
 import { useRouter } from 'next/navigation';
 
@@ -18,11 +18,9 @@ export default function AdminSidebar() {
 
     const isActive = (path: string) => pathname === path;
 
+    // Brief klienta: super admin zarządza podmiotami - bez planów, subskrypcji i modułów.
     const navItems = [
-        { label: 'Dashboard', path: '/admin', icon: LayoutDashboard },
         { label: 'Podmioty', path: '/admin/companies', icon: Building2 },
-        { label: 'Plany i Moduły', path: '/admin/plans', icon: Layers },
-        // { label: 'Użytkownicy', path: '/admin/users', icon: Users },
     ];
 
     return (

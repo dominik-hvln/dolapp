@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { superAdminApi, getApiErrorMessage, SuperAdminCompany } from '@/lib/api';
 import { useCompanyContextStore } from '@/store/company-context.store';
@@ -75,7 +74,6 @@ export default function CompaniesPage() {
                                 <TableCell className="text-right space-x-2">
                                     <Button size="sm" onClick={() => { enterCompany({ id: company.id, name: company.name }); router.push('/dashboard'); }}>Zarządzaj</Button>
                                     <Button size="sm" variant="outline" onClick={() => { setRenaming(company); setName(company.name); }}>Zmień nazwę</Button>
-                                    <Button asChild size="sm" variant="outline"><Link href={`/admin/companies/${company.id}`}>Szczegóły</Link></Button>
                                 </TableCell>
                             </TableRow>
                         ))}

@@ -128,7 +128,6 @@ export interface SuperAdminModule {
 
 export interface CreateCompanyDto {
     name: string;
-    planId?: string;
     admin?: { email: string; password: string; firstName: string; lastName: string };
 }
 

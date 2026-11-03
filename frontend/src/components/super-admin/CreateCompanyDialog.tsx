@@ -1,6 +1,5 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -10,12 +9,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 
 const schema = z.object({
     name: z.string().trim().min(1, 'Podaj nazwę podmiotu.'),
-    planId: z.string(),
     createAdmin: z.boolean(),
     firstName: z.string(),
     lastName: z.string(),
@@ -37,27 +34,16 @@ interface CreateCompanyDialogProps {
 }
 
 export function CreateCompanyDialog({ open, onOpenChange, onSuccess }: CreateCompanyDialogProps) {
-    const [plans, setPlans] = useState<{ id: string; name: string }[]>([]);
     const form = useForm<z.infer<typeof schema>>({
         resolver: zodResolver(schema),
-        defaultValues: { name: '', planId: 'none', createAdmin: false, firstName: '', lastName: '', email: '', password: '' },
+        defaultValues: { name: '', createAdmin: true, firstName: '', lastName: '', email: '', password: '' },
     });
     const createAdmin = form.watch('createAdmin');
-
-    useEffect(() => {
-        if (!open) return;
-        let cancelled = false;
-        superAdminApi.getPlans()
-            .then((data) => { if (!cancelled) setPlans(data); })
-            .catch((error: unknown) => toast.error(getApiErrorMessage(error, 'Nie udało się pobrać planów.')));
-        return () => { cancelled = true; };
-    }, [open]);
 
     const submit = async (values: z.infer<typeof schema>) => {
         try {
             await superAdminApi.createCompany({
                 name: values.name,
-                ...(values.planId !== 'none' ? { planId: values.planId } : {}),
                 ...(values.createAdmin ? { admin: { firstName: values.firstName.trim(), lastName: values.lastName.trim(), email: values.email.trim(), password: values.password } } : {}),
             });
             toast.success('Podmiot został utworzony');
@@ -77,14 +63,6 @@ export function CreateCompanyDialog({ open, onOpenChange, onSuccess }: CreateCom
                     <form onSubmit={form.handleSubmit(submit)} className="space-y-4">
                         <FormField control={form.control} name="name" render={({ field }) => (
                             <FormItem><FormLabel>Nazwa podmiotu</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
-                        )} />
-                        <FormField control={form.control} name="planId" render={({ field }) => (
-                            <FormItem><FormLabel>Plan (opcjonalnie)</FormLabel>
-                                <Select value={field.value} onValueChange={field.onChange}>
-                                    <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
-                                    <SelectContent><SelectItem value="none">Bez planu</SelectItem>{plans.map((plan) => <SelectItem key={plan.id} value={plan.id}>{plan.name}</SelectItem>)}</SelectContent>
-                                </Select><FormMessage />
-                            </FormItem>
                         )} />
                         <FormField control={form.control} name="createAdmin" render={({ field }) => (
                             <FormItem className="flex items-center gap-2"><FormControl><Checkbox checked={field.value} onCheckedChange={(value) => field.onChange(value === true)} /></FormControl><FormLabel>Utwórz administratora podmiotu</FormLabel></FormItem>

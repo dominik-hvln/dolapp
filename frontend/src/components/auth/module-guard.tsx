@@ -47,17 +47,12 @@ export function ModuleGuard({ children, moduleCode }: ModuleGuardProps) {
                 <ShieldAlert className="w-16 h-16 text-red-500" />
                 <h1 className="text-2xl font-bold text-gray-900">Moduł niedostępny</h1>
                 <p className="text-gray-500 max-w-md">
-                    Twoja firma nie posiada dostępu do modułu <code>{moduleCode}</code> w ramach obecnego planu subskrypcji.
+                    Ta funkcja nie jest włączona dla Twojej firmy. Wyloguj się i zaloguj ponownie, a jeśli to nie pomoże, skontaktuj się z administratorem.
                 </p>
                 <div className="flex gap-4">
                     <Button variant="outline" onClick={() => router.push('/dashboard')}>
                         Wróć do Panelu
                     </Button>
-                    {user?.role === 'admin' && (
-                        <Button onClick={() => router.push('/dashboard/billing')}>
-                            Ulepsz Plan
-                        </Button>
-                    )}
                 </div>
             </div>
         );
