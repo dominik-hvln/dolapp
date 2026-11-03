@@ -95,11 +95,15 @@ export default function ResetPasswordPage() {
                 <Card className="w-full max-w-sm">
                     <CardHeader className="text-center">
                         <CardTitle className="text-2xl">Hasło zmienione 🎉</CardTitle>
-                        <CardDescription>Możesz zalogować się nowym hasłem.</CardDescription>
+                        <CardDescription>Wróć do aplikacji Dolapp na telefonie i zaloguj się nowym hasłem.</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-3">
+                        {/* Pracownicy resetują hasło z aplikacji mobilnej - wracają do niej przez schemat dolapp:// */}
                         <Button asChild className="w-full">
-                            <Link href="/">Przejdź do logowania</Link>
+                            <a href="dolapp://login">Otwórz aplikację Dolapp</a>
+                        </Button>
+                        <Button asChild variant="outline" className="w-full">
+                            <Link href="/">Zaloguj się do panelu (administratorzy)</Link>
                         </Button>
                     </CardContent>
                 </Card>
