@@ -17,7 +17,16 @@ export interface TaskOption {
     project?: { name: string } | null;
 }
 
+export type TimeTrackingMode = 'continuous' | 'pause_outside_zone';
+
+export const TIME_TRACKING_MODE_OPTIONS: { value: TimeTrackingMode; label: string; description: string }[] = [
+    { value: 'continuous', label: 'Czas ciągły', description: 'Czas liczy się bez przerwy, a wyjście ze strefy jest tylko odnotowywane.' },
+    { value: 'pause_outside_zone', label: 'Zatrzymanie po wyjściu ze strefy', description: 'Czas zatrzymuje się po wyjściu ze strefy i wznawia po powrocie.' },
+];
+
 export interface CompanySettings {
+    time_tracking_mode?: TimeTrackingMode | null;
+    time_tracking_mode_pending?: { mode: TimeTrackingMode; from: string } | null;
     overtime_reminder_interval_minutes: number;
     default_overtime_task_id?: string | null;
 }

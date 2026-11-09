@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/auth.store'; // Upewnij się, że ścieżka jest poprawna
 import Sidebar from '@/components/layout/Sidebar';
 import Header from '@/components/layout/Header';
+import { TimeTrackingModeGate } from '@/components/layout/TimeTrackingModeGate';
 import { Toaster } from '@/components/ui/sonner'; // Przenieś Toaster tutaj LUB zostaw w RootLayout
 
 import { useCompanyContextStore } from '@/store/company-context.store';
@@ -58,6 +59,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     </div>
                 </main>
                 <Toaster richColors />
+                <TimeTrackingModeGate />
             </div>
         </div>
     );

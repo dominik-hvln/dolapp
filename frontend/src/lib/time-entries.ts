@@ -14,6 +14,7 @@ export interface TimeEntry {
     end_time: string | null;
     paused_at?: string | null;
     switched_by?: 'auto_limit' | null;
+    closed_by?: 'auto_max_hours' | null;
     duration_minutes?: number | null;
     paused_minutes?: number | null;
     outside_minutes?: number | null;

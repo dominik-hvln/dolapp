@@ -11,6 +11,7 @@ import { EmployeeDocumentsDialog } from '@/components/users/EmployeeDocumentsDia
 import { toast } from 'sonner';
 import { Pencil } from 'lucide-react';
 import { CompanyOvertimeSettingsCard } from '@/components/users/CompanyOvertimeSettingsCard';
+import { CompanyTimeModeCard } from '@/components/users/CompanyTimeModeCard';
 import type { TaskOption } from '@/lib/users';
 
 interface User extends EditableUser {
@@ -76,6 +77,7 @@ export default function UsersPage() {
                 </Dialog>
             </div>
             <div className="mb-6">
+                <CompanyTimeModeCard />
                 <CompanyOvertimeSettingsCard tasks={tasks} onSettingsChange={() => fetchUsers()} />
             </div>
             <div className="border rounded-lg">

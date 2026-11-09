@@ -46,6 +46,7 @@ function TimeEntriesContent() {
     const selectedTaskId = selectedProjectId === 'all' ? 'all' : searchParams.get('taskId') || 'all';
     const rawKind = searchParams.get('kind');
     const selectedKind = rawKind === 'regular' || rawKind === 'overtime' ? rawKind : 'all';
+    const onlyReview = searchParams.get('review') === '1';
     const dateFrom = searchParams.get('dateFrom');
     const dateTo = searchParams.get('dateTo');
     const date = useMemo<DateRange | undefined>(() => {
@@ -73,6 +74,7 @@ function TimeEntriesContent() {
     if (selectedProjectId !== 'all') query.set('projectId', selectedProjectId);
     if (selectedTaskId !== 'all') query.set('taskId', selectedTaskId);
     if (selectedKind !== 'all') query.set('kind', selectedKind);
+    if (onlyReview) query.set('review', '1');
     const queryString = query.toString();
     const [entryToEdit, setEntryToEdit] = useState<TimeEntry | null>(null);
     const [entryToDelete, setEntryToDelete] = useState<TimeEntry | null>(null);
@@ -331,6 +333,13 @@ function TimeEntriesContent() {
                         <SelectContent><SelectItem value="all">Wszystko</SelectItem><SelectItem value="regular">Czas podstawowy</SelectItem><SelectItem value="overtime">Nadgodziny</SelectItem></SelectContent>
                     </Select>
                 </div>
+                <div className="space-y-1">
+                    <Label>Weryfikacja</Label>
+                    <Select value={onlyReview ? '1' : 'all'} onValueChange={(value) => updateFilters({ review: value })}>
+                        <SelectTrigger aria-label="Weryfikacja" className="w-full sm:w-[200px]"><SelectValue /></SelectTrigger>
+                        <SelectContent><SelectItem value="all">Wszystkie wpisy</SelectItem><SelectItem value="1">Do weryfikacji</SelectItem></SelectContent>
+                    </Select>
+                </div>
                 <Button onClick={fetchTimeEntries} disabled={isLoading}>Filtruj</Button>
                 <div className="flex gap-2 ml-auto">
                     <Button variant="outline" size="sm" onClick={handleExportCSV} disabled={isLoading}>
@@ -387,6 +396,18 @@ function TimeEntriesContent() {
                                         <div className="flex items-center gap-1"> {/* Zmniejszony odstęp */}
                                             <span>{entry.user.first_name} {entry.user.last_name}</span>
                                             {entry.was_edited && <Badge variant="outline" className="ml-1 px-1 text-xs">Edyt.</Badge>} {/* Zmniejszony badge */}
+                                            {entry.closed_by === 'auto_max_hours' && !entry.was_edited && (
+                                                <TooltipProvider delayDuration={100}>
+                                                    <Tooltip>
+                                                        <TooltipTrigger asChild>
+                                                            <Badge variant="destructive" className="ml-1 px-1 text-xs">Do weryfikacji</Badge>
+                                                        </TooltipTrigger>
+                                                        <TooltipContent>
+                                                            <p>Praca zakończona automatycznie 3 h po limicie dziennym. Edycja wpisu zdejmuje oznaczenie.</p>
+                                                        </TooltipContent>
+                                                    </Tooltip>
+                                                </TooltipProvider>
+                                            )}
                                             {entry.is_outside_geofence && (
                                                 <TooltipProvider delayDuration={100}>
                                                     <Tooltip>
