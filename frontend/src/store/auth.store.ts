@@ -12,6 +12,7 @@ interface User {
     role: 'admin' | 'manager' | 'employee' | 'super_admin';
     company_id?: string; // ✅ Dodajemy brakujące pole
     modules?: string[]; // ✅ Lista aktywnych modułów
+    is_active?: boolean;
 }
 
 interface AuthState {

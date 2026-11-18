@@ -103,6 +103,9 @@ export default function LoginPage() {
             if (!session || !profile) {
                 throw new Error('Nieprawidłowa odpowiedź serwera.');
             }
+            if (profile.role !== 'super_admin' && profile.is_active !== true) {
+                throw new Error('Konto oczekuje na aktywację przez administratora firmy.');
+            }
 
             setSession(session.access_token, session.refresh_token, profile);
 

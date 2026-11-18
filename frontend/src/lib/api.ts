@@ -42,6 +42,13 @@ api.interceptors.response.use(
     async (error: AxiosError) => {
         const originalRequest = error.config;
 
+        // Konto niezatwierdzone przez admina (lub dezaktywowane): wyloguj i wróć do logowania.
+        if (error.response?.status === 403 && (error.response.data as { code?: string } | undefined)?.code === 'ACCOUNT_INACTIVE') {
+            useAuthStore.getState().logout();
+            if (window.location.pathname !== '/') window.location.href = '/';
+            return Promise.reject(error);
+        }
+
         // @ts-expect-error _retry to niestandardowa właściwość
         if (error.response?.status === 401 && !originalRequest._retry) {
             // @ts-expect-error _retry to niestandardowa właściwość
