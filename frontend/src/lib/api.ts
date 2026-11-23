@@ -49,6 +49,16 @@ api.interceptors.response.use(
             return Promise.reject(error);
         }
 
+        // Zapamiętany podmiot super admina już nie istnieje: wyjdź z niego, zamiast blokować cały panel.
+        const message = (error.response?.data as { message?: string } | undefined)?.message;
+        if (error.response?.status === 403 && useCompanyContextStore.getState().activeCompany
+            && (message === 'Wybrany podmiot nie istnieje.' || message === 'Nieprawidłowy identyfikator podmiotu.')) {
+            useCompanyContextStore.getState().exitCompany();
+            toast.info('Podmiot nie jest już dostępny. Wybierz inny.', { id: 'company-gone' });
+            if (!window.location.pathname.startsWith('/admin')) window.location.href = '/admin/companies';
+            return Promise.reject(error);
+        }
+
         // @ts-expect-error _retry to niestandardowa właściwość
         if (error.response?.status === 401 && !originalRequest._retry) {
             // @ts-expect-error _retry to niestandardowa właściwość

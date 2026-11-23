@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { superAdminApi, getApiErrorMessage, SuperAdminCompany } from '@/lib/api';
 import { useCompanyContextStore } from '@/store/company-context.store';
+import { useAuthStore } from '@/store/auth.store';
 import { CreateCompanyDialog } from '@/components/super-admin/CreateCompanyDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,6 +18,8 @@ import { pl } from 'date-fns/locale';
 export default function CompaniesPage() {
     const [companies, setCompanies] = useState<SuperAdminCompany[]>([]);
     const [loading, setLoading] = useState(true);
+    const [loadError, setLoadError] = useState(false);
+    const ownCompanyId = useAuthStore((state) => state.user?.company_id);
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [renaming, setRenaming] = useState<SuperAdminCompany | null>(null);
     const [name, setName] = useState('');
@@ -26,9 +29,12 @@ export default function CompaniesPage() {
 
     const fetchCompanies = async () => {
         setLoading(true);
+        setLoadError(false);
         try {
-            setCompanies(await superAdminApi.getCompanies());
+            // Podmiot techniczny super admina („Dolapp (administracja)”) nie jest firmą klienta.
+            setCompanies((await superAdminApi.getCompanies()).filter((company) => company.id !== ownCompanyId));
         } catch (error) {
+            setLoadError(true);
             toast.error(getApiErrorMessage(error, 'Nie udało się pobrać podmiotów.'));
         } finally {
             setLoading(false);
@@ -77,7 +83,8 @@ export default function CompaniesPage() {
                                 </TableCell>
                             </TableRow>
                         ))}
-                        {!loading && companies.length === 0 && <TableRow><TableCell colSpan={5} className="text-center py-8">Brak podmiotów w systemie.</TableCell></TableRow>}
+                        {!loading && loadError && <TableRow><TableCell colSpan={5} className="text-center py-8">Nie udało się pobrać podmiotów. <Button size="sm" variant="outline" className="ml-2" onClick={fetchCompanies}>Spróbuj ponownie</Button></TableCell></TableRow>}
+                        {!loading && !loadError && companies.length === 0 && <TableRow><TableCell colSpan={5} className="text-center py-8">Brak podmiotów w systemie.</TableCell></TableRow>}
                     </TableBody>
                 </Table>
             </div>
