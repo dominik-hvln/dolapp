@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/auth.store';
 import { useCompanyContextStore } from '@/store/company-context.store';
@@ -9,14 +9,19 @@ import { Toaster } from '@/components/ui/sonner';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
     const { isAuthenticated, isHydrating, user } = useAuthStore();
-    const { activeCompany, isHydrating: contextHydrating, exitCompany } = useCompanyContextStore();
+    const { isHydrating: contextHydrating, exitCompany } = useCompanyContextStore();
+    const [contextReady, setContextReady] = useState(false);
     const router = useRouter();
 
     // Strefa super admina działa poza podmiotem: zapamiętany podmiot (np. po wejściu z menu
     // albo już usunięty) dokładałby nagłówek X-Company-Id i psuł listę podmiotów.
+    // Czyścimy go tylko raz, przy wejściu do strefy. Później „Zarządzaj” ustawia podmiot
+    // tuż przed przejściem do pulpitu i nie wolno go tu od razu kasować.
     useEffect(() => {
-        if (!contextHydrating && activeCompany) exitCompany();
-    }, [contextHydrating, activeCompany, exitCompany]);
+        if (contextHydrating || contextReady) return;
+        if (useCompanyContextStore.getState().activeCompany) exitCompany();
+        setContextReady(true);
+    }, [contextHydrating, contextReady, exitCompany]);
 
     useEffect(() => {
         if (isHydrating) return;
@@ -32,7 +37,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         }
     }, [isAuthenticated, isHydrating, user, router]);
 
-    if (isHydrating || contextHydrating || activeCompany || !isAuthenticated) {
+    if (isHydrating || !contextReady || !isAuthenticated) {
         return <div className="flex h-screen items-center justify-center">Ładowanie Panelu...</div>;
     }
 
