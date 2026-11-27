@@ -15,6 +15,9 @@ export interface TimeEntry {
     paused_at?: string | null;
     switched_by?: 'auto_limit' | null;
     closed_by?: 'auto_max_hours' | null;
+    signal_gap_minutes?: number | null;
+    signal_gap_from?: string | null;
+    signal_gap_flag?: boolean;
     duration_minutes?: number | null;
     paused_minutes?: number | null;
     outside_minutes?: number | null;

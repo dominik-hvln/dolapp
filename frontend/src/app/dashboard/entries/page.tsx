@@ -408,6 +408,18 @@ function TimeEntriesContent() {
                                                     </Tooltip>
                                                 </TooltipProvider>
                                             )}
+                                            {entry.signal_gap_flag && !entry.was_edited && (
+                                                <TooltipProvider delayDuration={100}>
+                                                    <Tooltip>
+                                                        <TooltipTrigger asChild>
+                                                            <Badge variant="destructive" className="ml-1 px-1 text-xs">Brak sygnału</Badge>
+                                                        </TooltipTrigger>
+                                                        <TooltipContent>
+                                                            <p>Telefon nie wysyłał położenia przez {formatMinutes(entry.signal_gap_minutes ?? 0)}{entry.signal_gap_from ? ` (od ${warsawTime(entry.signal_gap_from)})` : ''}. Wyjście ze strefy w tym czasie mogło nie zostać zapisane. Edycja wpisu zdejmuje oznaczenie.</p>
+                                                        </TooltipContent>
+                                                    </Tooltip>
+                                                </TooltipProvider>
+                                            )}
                                             {entry.is_outside_geofence && (
                                                 <TooltipProvider delayDuration={100}>
                                                     <Tooltip>
